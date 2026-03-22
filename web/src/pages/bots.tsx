@@ -17,8 +17,8 @@ export function BotsPage() {
   const [binding, setBinding] = useState(false);
   const [qrUrl, setQrUrl] = useState("");
   const [bindStatus, setBindStatus] = useState("");
-  const [enableAI, setEnableAI] = useState(false);
   const [hasGlobalAI, setHasGlobalAI] = useState(false);
+  const [enableAI, setEnableAI] = useState(false);
 
   async function load() {
     const [b, c] = await Promise.all([api.listBots(), api.listChannels()]);
@@ -26,7 +26,10 @@ export function BotsPage() {
     setChannels(c || []);
   }
 
-  useEffect(() => { load(); api.features().then((f) => setHasGlobalAI(f.ai)).catch(() => {}); }, []);
+  useEffect(() => {
+    load();
+    api.features().then((f) => { setHasGlobalAI(f.ai); setEnableAI(f.ai); }).catch(() => {});
+  }, []);
 
   async function startBind() {
     setBinding(true);
