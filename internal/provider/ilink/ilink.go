@@ -101,16 +101,19 @@ func (p *Provider) Start(ctx context.Context, opts provider.StartOptions) error 
 			},
 		})
 
-		var newStatus string
-		if err != nil && err != context.Canceled {
-			slog.Error("ilink monitor stopped", "err", err)
-			newStatus = "error"
-		} else {
-			newStatus = "disconnected"
-		}
-		p.status.Store(newStatus)
-		if opts.OnStatus != nil {
-			opts.OnStatus(newStatus)
+		// Don't overwrite session_expired — that's a terminal state
+		if p.Status() != "session_expired" {
+			var newStatus string
+			if err != nil && err != context.Canceled {
+				slog.Error("ilink monitor stopped", "err", err)
+				newStatus = "error"
+			} else {
+				newStatus = "disconnected"
+			}
+			p.status.Store(newStatus)
+			if opts.OnStatus != nil {
+				opts.OnStatus(newStatus)
+			}
 		}
 	}()
 

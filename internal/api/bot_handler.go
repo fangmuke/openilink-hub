@@ -162,6 +162,11 @@ func (s *Server) handleReconnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if bot.Status == "session_expired" {
+		jsonError(w, "session expired, please re-bind this bot", http.StatusConflict)
+		return
+	}
+
 	s.BotManager.StartBot(r.Context(), bot)
 	jsonOK(w)
 }

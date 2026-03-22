@@ -63,6 +63,11 @@ func (m *Manager) StartAll(ctx context.Context) {
 		if len(b.Credentials) == 0 || string(b.Credentials) == "{}" {
 			continue
 		}
+		// Don't auto-start bots with expired sessions — need manual re-bind
+		if b.Status == "session_expired" {
+			slog.Info("skip expired bot", "bot", b.ID)
+			continue
+		}
 		if err := m.StartBot(ctx, &b); err != nil {
 			slog.Error("failed to start bot", "bot", b.ID, "err", err)
 		}
