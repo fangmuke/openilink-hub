@@ -23,6 +23,12 @@ function getMediaUrl(m: Message, index: number): string | null {
   return null;
 }
 
+function getSilkUrl(m: Message, index: number): string | null {
+  const key = m.media_keys?.[`${index}_silk`];
+  if (key) return `/api/v1/media/${key}`;
+  return null;
+}
+
 function getItemMediaType(item: MessageItem): string {
   return item.type || "text";
 }
@@ -38,10 +44,15 @@ function ItemContent({ item, m, index }: { item: MessageItem; m: Message; index:
     return <video src={url} controls className="max-w-full rounded-lg max-h-48" />;
   }
   if (mediaType === "voice" && url) {
+    const silkUrl = getSilkUrl(m, index);
     return (
       <div className="space-y-1">
         <audio src={url} controls className="h-8" />
         {item.text && item.text !== "[voice]" && <p className="text-xs opacity-70">{item.text}</p>}
+        <div className="flex gap-2 text-[10px]">
+          <a href={url} download className="text-muted-foreground hover:text-primary">WAV</a>
+          {silkUrl && <a href={silkUrl} download className="text-muted-foreground hover:text-primary">SILK</a>}
+        </div>
       </div>
     );
   }

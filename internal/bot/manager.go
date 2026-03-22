@@ -336,7 +336,7 @@ func (m *Manager) downloadMedia(inst *Instance, msg provider.InboundMessage, msg
 	}()
 
 	slog.Info("media download start", "bot", inst.DBID, "msg", msg.ExternalID)
-	m.processMedia(inst, &msg)
+	silkKeys := m.processMedia(inst, &msg)
 
 	// Collect storage keys
 	keys := map[string]string{}
@@ -355,6 +355,9 @@ func (m *Manager) downloadMedia(inst *Instance, msg provider.InboundMessage, msg
 		}
 		if item.Media.ThumbURL != "" {
 			keys[idx+"_thumb"] = item.Media.ThumbURL
+		}
+		if sk, ok := silkKeys[i]; ok {
+			keys[idx+"_silk"] = sk
 		}
 	}
 
@@ -428,9 +431,10 @@ func (m *Manager) deliverToChannels(inst *Instance, msg provider.InboundMessage,
 // processMedia handles media items:
 // - With MinIO: download → store → set URL to MinIO
 // - Without MinIO: set URL to Hub proxy endpoint
-func (m *Manager) processMedia(inst *Instance, msg *provider.InboundMessage) {
+func (m *Manager) processMedia(inst *Instance, msg *provider.InboundMessage) map[int]string {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
+	silkKeys := map[int]string{} // index → raw SILK storage key
 	for i := range msg.Items {
 		item := &msg.Items[i]
 		if item.Media == nil || item.Media.EncryptQueryParam == "" {
@@ -449,7 +453,9 @@ func (m *Manager) processMedia(inst *Instance, msg *provider.InboundMessage) {
 					silkKey := fmt.Sprintf("%s/%d/%02d/%02d/%s_%d_raw.silk",
 						inst.DBID, now.Year(), now.Month(), now.Day(),
 						msg.ExternalID, i)
-					m.store.Put(ctx, silkKey, "audio/silk", rawSilk)
+					if _, err := m.store.Put(ctx, silkKey, "audio/silk", rawSilk); err == nil {
+						silkKeys[i] = silkKey
+					}
 				}
 				data, err = m.downloadVoiceWithFallback(ctx, inst, item)
 			} else {
@@ -493,6 +499,7 @@ func (m *Manager) processMedia(inst *Instance, msg *provider.InboundMessage) {
 				mediaContentType(item.Type))
 		}
 	}
+	return silkKeys
 }
 
 // downloadVoiceWithFallback tries SILK decode at 24kHz, then with item's SampleRate, then raw file.
