@@ -264,6 +264,9 @@ func convertInbound(msg ilink.WeixinMessage) provider.InboundMessage {
 		}
 	}
 
+	// Store the original WeixinMessage as raw JSON
+	raw, _ := json.Marshal(msg)
+
 	return provider.InboundMessage{
 		ExternalID:   fmt.Sprintf("%d", msg.MessageID),
 		Sender:       msg.FromUserID,
@@ -274,6 +277,7 @@ func convertInbound(msg ilink.WeixinMessage) provider.InboundMessage {
 		Items:        items,
 		ContextToken: msg.ContextToken,
 		SessionID:    msg.SessionID,
+		Raw:          raw,
 	}
 }
 

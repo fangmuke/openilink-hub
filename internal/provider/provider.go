@@ -60,6 +60,7 @@ type InboundMessage struct {
 	Items        []MessageItem
 	ContextToken string
 	SessionID    string
+	Raw          json.RawMessage `json:"-"` // original provider message, not serialized in relay
 }
 
 type OutboundMessage struct {
