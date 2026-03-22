@@ -305,45 +305,50 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 		}
 	}
 
+	// Save messages and deliver to sinks
+	var savedMsgIDs []int64
 	if len(matched) == 0 {
 		// No channel matched — store without channel_id
-		m.db.SaveMessage(&database.Message{
+		seqID, _ := m.db.SaveMessage(&database.Message{
 			BotID: inst.DBID, Direction: "inbound", Sender: msg.Sender,
 			Recipient: msg.Recipient, MsgType: msgType, Payload: payload,
 		})
-		return
-	}
-
-	// Deliver to each matched channel
-	var savedMsgIDs []int64
-	for _, ch := range matched {
-		chID := ch.ID
-		seqID, _ := m.db.SaveMessage(&database.Message{
-			BotID: inst.DBID, ChannelID: &chID, Direction: "inbound",
-			Sender: msg.Sender, Recipient: msg.Recipient, MsgType: msgType, Payload: payload,
-		})
 		savedMsgIDs = append(savedMsgIDs, seqID)
-		_ = m.db.UpdateChannelLastSeq(ch.ID, seqID)
+	} else {
+		for _, ch := range matched {
+			chID := ch.ID
+			seqID, _ := m.db.SaveMessage(&database.Message{
+				BotID: inst.DBID, ChannelID: &chID, Direction: "inbound",
+				Sender: msg.Sender, Recipient: msg.Recipient, MsgType: msgType, Payload: payload,
+			})
+			savedMsgIDs = append(savedMsgIDs, seqID)
+			_ = m.db.UpdateChannelLastSeq(ch.ID, seqID)
 
-		env := relay.NewEnvelope("message", relay.MessageData{
-			SeqID: seqID, ExternalID: msg.ExternalID,
-			Sender: msg.Sender, Recipient: msg.Recipient, GroupID: msg.GroupID,
-			Timestamp: msg.Timestamp, MessageState: msg.MessageState,
-			Items: items, ContextToken: msg.ContextToken, SessionID: msg.SessionID,
-		})
+			env := relay.NewEnvelope("message", relay.MessageData{
+				SeqID: seqID, ExternalID: msg.ExternalID,
+				Sender: msg.Sender, Recipient: msg.Recipient, GroupID: msg.GroupID,
+				Timestamp: msg.Timestamp, MessageState: msg.MessageState,
+				Items: items, ContextToken: msg.ContextToken, SessionID: msg.SessionID,
+			})
 
-		d := sink.Delivery{
-			BotDBID: inst.DBID, Provider: inst.Provider, Channel: ch,
-			Message: msg, Envelope: env, SeqID: seqID, MsgType: msgType, Content: content,
-		}
-		for _, s := range m.sinks {
-			go s.Handle(d)
+			d := sink.Delivery{
+				BotDBID: inst.DBID, Provider: inst.Provider, Channel: ch,
+				Message: msg, Envelope: env, SeqID: seqID, MsgType: msgType, Content: content,
+			}
+			for _, s := range m.sinks {
+				go s.Handle(d)
+			}
 		}
 	}
 
-	// Async media download — update message payloads when done
-	if hasMedia {
-		go m.downloadAndUpdateMedia(inst, msg, payloadMap, savedMsgIDs)
+	// Async media download — always runs if there's media, regardless of channel match
+	if hasMedia && len(savedMsgIDs) > 0 {
+		// Copy payloadMap to avoid concurrent map access with sinks
+		pm := make(map[string]any, len(payloadMap))
+		for k, v := range payloadMap {
+			pm[k] = v
+		}
+		go m.downloadAndUpdateMedia(inst, msg, pm, savedMsgIDs)
 	}
 }
 
