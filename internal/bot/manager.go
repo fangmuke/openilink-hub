@@ -189,10 +189,10 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 	// Process media: download to MinIO (sets item.Media.URL for relay/webhook)
 	m.processMedia(inst, &msg)
 
-	// If stored to MinIO, also save the storage key
+	// If stored to MinIO, save the storage key
 	for _, item := range msg.Items {
-		if item.Media != nil && item.Media.URL != "" {
-			payloadMap["media_key"] = extractMediaKey(item.Media.URL)
+		if item.Media != nil && item.Media.StorageKey != "" {
+			payloadMap["media_key"] = item.Media.StorageKey
 			break
 		}
 	}
@@ -301,13 +301,14 @@ func (m *Manager) processMedia(inst *Instance, msg *provider.InboundMessage) {
 			}
 			ext := mediaExt(item.Type)
 			ct := mediaContentType(item.Type)
-			key := fmt.Sprintf("media/%s/%s/%d%s", inst.DBID, msg.ExternalID, i, ext)
+			key := fmt.Sprintf("%s/%s/%d%s", inst.DBID, msg.ExternalID, i, ext)
 			url, err := m.store.Put(ctx, key, ct, data)
 			if err != nil {
 				slog.Error("media store failed", "bot", inst.DBID, "key", key, "err", err)
 				continue
 			}
 			item.Media.URL = url
+			item.Media.StorageKey = key
 			item.Media.FileSize = int64(len(data))
 		} else {
 			// Fallback: proxy URL via Hub
@@ -316,16 +317,6 @@ func (m *Manager) processMedia(inst *Instance, msg *provider.InboundMessage) {
 				mediaContentType(item.Type))
 		}
 	}
-}
-
-func extractMediaKey(url string) string {
-	// URL is like "https://hub.example.com/api/v1/media/media/bot-id/msg/0.jpg"
-	// Extract "media/bot-id/msg/0.jpg"
-	idx := strings.Index(url, "/media/")
-	if idx >= 0 {
-		return url[idx+1:] // skip the leading "/"
-	}
-	return url
 }
 
 func mediaExt(itemType string) string {

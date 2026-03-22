@@ -23,6 +23,7 @@ import (
 	mockProvider "github.com/openilink/openilink-hub/internal/provider/mock"
 	"github.com/openilink/openilink-hub/internal/relay"
 	"github.com/openilink/openilink-hub/internal/sink"
+	"github.com/openilink/openilink-hub/internal/storage"
 )
 
 // ==================== Test infrastructure ====================
@@ -1900,4 +1901,122 @@ func TestAIContextIsolation(t *testing.T) {
 	if len(msgs3) != 0 {
 		t.Errorf("other sender: want 0, got %d", len(msgs3))
 	}
+}
+
+// ==================== Media storage ====================
+
+func TestMediaStorageAndProxy(t *testing.T) {
+	// Requires MinIO running on localhost:19000
+	store, err := storage.New(storage.Config{
+		Endpoint:  "localhost:19000",
+		AccessKey: "openilink",
+		SecretKey: "openilink",
+		Bucket:    "openilink-test",
+		UseSSL:    false,
+		PublicURL: "", // will be set after server starts
+	})
+	if err != nil {
+		t.Skipf("skip: MinIO unavailable: %v", err)
+	}
+
+	db := testDB(t)
+	cfg := &config.Config{RPOrigin: "http://localhost", RPID: "localhost", RPName: "Test", Secret: "test"}
+	server := &api.Server{
+		DB: db, SessionStore: auth.NewSessionStore(), Config: cfg,
+		OAuthStates: api.SetupOAuth(cfg), Store: store,
+	}
+	hub := relay.NewHub(server.SetupUpstreamHandler())
+	sinks := []sink.Sink{&sink.WS{Hub: hub}, &sink.AI{DB: db}, &sink.Webhook{DB: db}}
+	mgr := bot.NewManager(db, hub, sinks, store, "http://localhost")
+	server.BotManager = mgr
+	server.Hub = hub
+	ts := httptest.NewServer(server.Handler())
+	defer ts.Close()
+	defer mgr.StopAll()
+	defer db.Close()
+
+	// Update storage public URL to test server
+	// We need to put files with keys that resolve through the proxy
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar}
+
+	// Register and login
+	data, _ := json.Marshal(map[string]string{"username": "mediauser", "password": "password123"})
+	resp, _ := client.Post(ts.URL+"/api/auth/register", "application/json", bytes.NewReader(data))
+	resp.Body.Close()
+
+	// Get user ID
+	resp, _ = client.Get(ts.URL + "/api/me")
+	var me map[string]any
+	json.NewDecoder(resp.Body).Decode(&me)
+	resp.Body.Close()
+	userID := me["id"].(string)
+
+	// Create bot
+	botObj, _ := db.CreateBot(userID, "MediaBot", "mock", mockProvider.Credentials())
+	mgr.StartBot(context.Background(), botObj)
+	ch, _ := db.CreateChannel(botObj.ID, "MediaChan", "", nil, nil)
+
+	// Simulate inbound with image media
+	inst, _ := mgr.GetInstance(botObj.ID)
+	mock := inst.Provider.(*mockProvider.Provider)
+	mock.SimulateInbound(provider.InboundMessage{
+		ExternalID: "img-1",
+		Sender:     "u@wx",
+		Timestamp:  time.Now().UnixMilli(),
+		Items: []provider.MessageItem{{
+			Type: "image",
+			Media: &provider.Media{
+				EncryptQueryParam: "test-eqp",
+				AESKey:            "test-aes",
+				MediaType:         "image",
+			},
+		}},
+	})
+
+	time.Sleep(500 * time.Millisecond)
+
+	// Check message has media_key in payload
+	msgs, _ := db.ListChannelMessages(ch.ID, "u@wx", 10)
+	if len(msgs) == 0 {
+		t.Fatal("no messages found")
+	}
+	var payload map[string]any
+	json.Unmarshal(msgs[0].Payload, &payload)
+
+	mediaKey, ok := payload["media_key"].(string)
+	if !ok || mediaKey == "" {
+		t.Fatalf("media_key not in payload: %v", payload)
+	}
+	t.Logf("media_key = %s", mediaKey)
+
+	// Verify key format: {bot_id}/{msg_id}/{index}.jpg
+	if !strings.HasPrefix(mediaKey, botObj.ID) {
+		t.Errorf("media_key should start with bot ID, got %s", mediaKey)
+	}
+	if !strings.HasSuffix(mediaKey, ".jpg") {
+		t.Errorf("media_key should end with .jpg, got %s", mediaKey)
+	}
+
+	// Fetch via media proxy (with session cookie)
+	mediaURL := ts.URL + "/api/v1/media/" + mediaKey
+	resp, err = client.Get(mediaURL)
+	if err != nil {
+		t.Fatalf("fetch media: %v", err)
+	}
+	defer resp.Body.Close()
+	assertCode(t, "media proxy", resp.StatusCode, 200)
+
+	var body bytes.Buffer
+	body.ReadFrom(resp.Body)
+	if body.String() != "mock-media-data" {
+		t.Errorf("media content = %q, want mock-media-data", body.String())
+	}
+
+	// Fetch without auth → 401
+	plainResp := httpGet(t, mediaURL)
+	assertCode(t, "media no auth", plainResp.StatusCode, 401)
+	plainResp.Body.Close()
+
+	t.Logf("Full media URL: %s", mediaURL)
 }

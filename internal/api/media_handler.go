@@ -68,13 +68,13 @@ func (s *Server) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract bot_id from key: media/{bot_id}/...
+	// Extract bot_id from key: {bot_id}/{msg_id}/{index}.ext
 	parts := strings.SplitN(key, "/", 3)
-	if len(parts) < 2 || parts[0] != "media" {
+	if len(parts) < 2 {
 		http.Error(w, "invalid key", http.StatusBadRequest)
 		return
 	}
-	botID := parts[1]
+	botID := parts[0]
 
 	// Auth: session cookie → check bot ownership
 	authed := false

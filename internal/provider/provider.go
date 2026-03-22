@@ -78,6 +78,7 @@ type MessageItem struct {
 // Media holds CDN media info for image/voice/file/video items.
 type Media struct {
 	URL               string `json:"url,omitempty"`
+	StorageKey        string `json:"-"` // MinIO object key, not serialized
 	EncryptQueryParam string `json:"encrypt_query_param,omitempty"`
 	AESKey            string `json:"aes_key,omitempty"`
 	FileSize          int64  `json:"file_size,omitempty"`
