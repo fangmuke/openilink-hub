@@ -476,7 +476,7 @@ func TestBotCRUD(t *testing.T) {
 	}
 
 	// Rename bot
-	code, _ = env.put("/api/bots/"+botObj.ID+"/name", map[string]string{"name": "Renamed"})
+	code, _ = env.put("/api/bots/"+botObj.ID, map[string]string{"name": "Renamed"})
 	assertCode(t, "rename bot", code, 200)
 
 	// Verify rename
@@ -519,7 +519,7 @@ func TestBotOwnershipIsolation(t *testing.T) {
 	}
 
 	// User2 can't rename user1's bot
-	code, _ := env.put("/api/bots/"+botObj.ID+"/name", map[string]string{"name": "hacked"})
+	code, _ := env.put("/api/bots/"+botObj.ID, map[string]string{"name": "hacked"})
 	assertCode(t, "rename other's bot", code, 404)
 
 	// User2 can't delete user1's bot
@@ -567,7 +567,7 @@ func TestChannelCRUD(t *testing.T) {
 	assertCode(t, "update channel", code, 200)
 
 	// Rotate key
-	code, rotated := env.postCode("/api/bots/"+botObj.ID+"/channels/"+chID+"/rotate-key", nil)
+	code, rotated := env.postCode("/api/bots/"+botObj.ID+"/channels/"+chID+"/rotate_key", nil)
 	assertCode(t, "rotate key", code, 200)
 	if rotated["api_key"] == nil || rotated["api_key"] == "" {
 		t.Error("rotated key should be returned")
@@ -617,7 +617,7 @@ func TestChannelOwnershipIsolation(t *testing.T) {
 	code, _ = env.del("/api/bots/" + botObj.ID + "/channels/" + ch.ID)
 	assertCode(t, "delete other's channel", code, 404)
 
-	code, _ = env.postCode("/api/bots/"+botObj.ID+"/channels/"+ch.ID+"/rotate-key", nil)
+	code, _ = env.postCode("/api/bots/"+botObj.ID+"/channels/"+ch.ID+"/rotate_key", nil)
 	assertCode(t, "rotate other's key", code, 404)
 
 	// User2 can't create channel on user1's bot

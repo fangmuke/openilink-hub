@@ -181,7 +181,7 @@ func (s *Server) handleDeleteBot(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w)
 }
 
-func (s *Server) handleUpdateBotName(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleUpdateBot(w http.ResponseWriter, r *http.Request) {
 	botID := r.PathValue("id")
 	userID := auth.UserIDFromContext(r.Context())
 
@@ -194,14 +194,16 @@ func (s *Server) handleUpdateBotName(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name string `json:"name"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Name == "" {
-		jsonError(w, "name required", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
 		return
 	}
 
-	if err := s.DB.UpdateBotName(botID, req.Name); err != nil {
-		jsonError(w, "update failed", http.StatusInternalServerError)
-		return
+	if req.Name != "" {
+		if err := s.DB.UpdateBotName(botID, req.Name); err != nil {
+			jsonError(w, "update failed", http.StatusInternalServerError)
+			return
+		}
 	}
 	jsonOK(w)
 }

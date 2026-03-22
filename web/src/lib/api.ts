@@ -35,8 +35,8 @@ export const api = {
   bindStart: () => request<{ session_id: string; qr_url: string }>("/api/bots/bind/start", { method: "POST" }),
   reconnectBot: (id: string) => request(`/api/bots/${id}/reconnect`, { method: "POST" }),
   deleteBot: (id: string) => request(`/api/bots/${id}`, { method: "DELETE" }),
-  renameBot: (id: string, name: string) =>
-    request(`/api/bots/${id}/name`, { method: "PUT", body: JSON.stringify({ name }) }),
+  updateBot: (id: string, data: { name?: string }) =>
+    request(`/api/bots/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   botContacts: (id: string) => request<any[]>(`/api/bots/${id}/contacts`),
 
   // Channels (under bots)
@@ -46,7 +46,7 @@ export const api = {
   updateChannel: (botId: string, id: string, data: any) =>
     request(`/api/bots/${botId}/channels/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteChannel: (botId: string, id: string) => request(`/api/bots/${botId}/channels/${id}`, { method: "DELETE" }),
-  rotateKey: (botId: string, id: string) => request<{ api_key: string }>(`/api/bots/${botId}/channels/${id}/rotate-key`, { method: "POST" }),
+  rotateKey: (botId: string, id: string) => request<{ api_key: string }>(`/api/bots/${botId}/channels/${id}/rotate_key`, { method: "POST" }),
 
   // OAuth accounts
   oauthAccounts: () => request<any[]>("/api/me/linked-accounts"),

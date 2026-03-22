@@ -92,13 +92,13 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("POST /api/bots/{id}/channels", s.handleCreateChannel)
 	protected.HandleFunc("PUT /api/bots/{id}/channels/{cid}", s.handleUpdateChannel)
 	protected.HandleFunc("DELETE /api/bots/{id}/channels/{cid}", s.handleDeleteChannel)
-	protected.HandleFunc("POST /api/bots/{id}/channels/{cid}/rotate-key", s.handleRotateKey)
+	protected.HandleFunc("POST /api/bots/{id}/channels/{cid}/rotate_key", s.handleRotateKey)
 
-	// Bot stats, contacts, send
-	protected.HandleFunc("GET /api/bots/stats", s.handleStats)
-	protected.HandleFunc("GET /api/bots/{id}/contacts", s.handleBotContacts)
-	protected.HandleFunc("PUT /api/bots/{id}/name", s.handleUpdateBotName)
+	// Bot operations
+	protected.HandleFunc("PUT /api/bots/{id}", s.handleUpdateBot)
 	protected.HandleFunc("POST /api/bots/{id}/send", s.handleBotSend)
+	protected.HandleFunc("GET /api/bots/{id}/contacts", s.handleBotContacts)
+	protected.HandleFunc("GET /api/bots/stats", s.handleStats)
 
 	// Messages (under bots)
 	protected.HandleFunc("GET /api/bots/{id}/messages", s.handleListMessages)
