@@ -164,33 +164,47 @@ func (m *Manager) RetryMediaDownload(msgID int64) error {
 		return fmt.Errorf("bot not connected")
 	}
 
-	// Mark as downloading
 	payload["media_status"] = "downloading"
 	p, _ := json.Marshal(payload)
 	m.db.UpdateMessagePayload(msgID, p)
 
+	slog.Info("media retry start", "msgID", msgID)
+
 	go func() {
-		item := provider.MessageItem{
-			Type: mediaType,
-			Media: &provider.Media{
-				EncryptQueryParam: eqp,
-				AESKey:            aes,
-				MediaType:         mediaType,
-			},
-		}
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("media retry panic", "msgID", msgID, "err", r)
+				payload["media_status"] = "failed"
+				updated, _ := json.Marshal(payload)
+				m.db.UpdateMessagePayload(msgID, updated)
+			}
+		}()
+
 		fakeMsg := provider.InboundMessage{
 			ExternalID: fmt.Sprintf("retry-%d", msgID),
-			Items:      []provider.MessageItem{item},
+			Items: []provider.MessageItem{{
+				Type: mediaType,
+				Media: &provider.Media{
+					EncryptQueryParam: eqp,
+					AESKey:            aes,
+					MediaType:         mediaType,
+				},
+			}},
 		}
 		m.processMedia(inst, &fakeMsg)
 
-		if fakeMsg.Items[0].Media.StorageKey != "" {
-			payload["media_key"] = fakeMsg.Items[0].Media.StorageKey
+		item := fakeMsg.Items[0]
+		if item.Media.StorageKey != "" {
+			payload["media_key"] = item.Media.StorageKey
 			payload["media_status"] = "ready"
-		} else if fakeMsg.Items[0].Media.URL != "" {
+			slog.Info("media retry done", "msgID", msgID)
+		} else if item.Media.URL != "" {
+			payload["media_url"] = item.Media.URL
 			payload["media_status"] = "ready"
+			slog.Info("media retry done (proxy)", "msgID", msgID)
 		} else {
 			payload["media_status"] = "failed"
+			slog.Error("media retry failed", "msgID", msgID)
 		}
 		updated, _ := json.Marshal(payload)
 		m.db.UpdateMessagePayload(msgID, updated)
