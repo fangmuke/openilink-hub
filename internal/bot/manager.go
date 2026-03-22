@@ -233,7 +233,7 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 		_ = m.db.UpdateChannelLastSeq(ch.ID, seqID)
 
 		if ch.AIConfig.Enabled && msgType == "text" && content != "" {
-			go m.aiReply(inst, ch, msg.Sender, content)
+			go m.aiReply(inst, ch, msg.Sender, msg.ContextToken, content)
 		}
 	}
 }
@@ -264,13 +264,32 @@ func (m *Manager) resolveAIConfig(cfg database.AIConfig) database.AIConfig {
 }
 
 // aiReply calls the AI completion API and sends the reply through the bot.
-func (m *Manager) aiReply(inst *Instance, ch database.Channel, sender, text string) {
+// It also sends typing indicators while the AI is processing.
+func (m *Manager) aiReply(inst *Instance, ch database.Channel, sender, contextToken, text string) {
 	resolved := m.resolveAIConfig(ch.AIConfig)
 	if resolved.APIKey == "" {
 		slog.Warn("ai reply skipped: no api key", "channel", ch.ID, "source", ch.AIConfig.Source)
 		return
 	}
-	reply, err := ai.Complete(context.Background(), resolved, m.db, inst.DBID, sender, text)
+
+	ctx := context.Background()
+
+	// Show typing indicator while AI is processing
+	var typingTicket string
+	if contextToken != "" {
+		if cfg, err := inst.Provider.GetConfig(ctx, sender, contextToken); err == nil && cfg.TypingTicket != "" {
+			typingTicket = cfg.TypingTicket
+			inst.Provider.SendTyping(ctx, sender, typingTicket, true)
+		}
+	}
+
+	reply, err := ai.Complete(ctx, resolved, m.db, inst.DBID, sender, text)
+
+	// Cancel typing
+	if typingTicket != "" {
+		inst.Provider.SendTyping(ctx, sender, typingTicket, false)
+	}
+
 	if err != nil {
 		slog.Error("ai completion failed", "channel", ch.ID, "err", err)
 		return
@@ -280,7 +299,7 @@ func (m *Manager) aiReply(inst *Instance, ch database.Channel, sender, text stri
 	}
 
 	// Send reply through bot
-	_, err = inst.Send(context.Background(), provider.OutboundMessage{
+	_, err = inst.Send(ctx, provider.OutboundMessage{
 		Recipient: sender,
 		Text:      reply,
 	})
@@ -296,7 +315,6 @@ func (m *Manager) aiReply(inst *Instance, ch database.Channel, sender, text stri
 		BotID:     inst.DBID,
 		ChannelID: &chID,
 		Direction: "outbound",
-		Sender:    "",
 		Recipient: sender,
 		MsgType:   "text",
 		Payload:   payload,
