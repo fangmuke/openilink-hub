@@ -118,6 +118,49 @@ func (s *Server) SetupUpstreamHandler() relay.UpstreamHandler {
 			})
 			conn.Send(relay.NewAck(env.ReqID, true, clientID, ""))
 
+		case "send_typing":
+			var data relay.SendTypingData
+			if err := json.Unmarshal(env.Data, &data); err != nil {
+				conn.Send(relay.NewAck(env.ReqID, false, "", "invalid data"))
+				return
+			}
+
+			inst, ok := s.BotManager.GetInstance(conn.BotID)
+			if !ok {
+				conn.Send(relay.NewAck(env.ReqID, false, "", "bot not connected"))
+				return
+			}
+
+			typing := data.Status != "cancel"
+			if err := inst.Provider.SendTyping(context.Background(), data.Recipient, data.Ticket, typing); err != nil {
+				conn.Send(relay.NewAck(env.ReqID, false, "", err.Error()))
+				return
+			}
+			conn.Send(relay.NewAck(env.ReqID, true, "", ""))
+
+		case "get_config":
+			var data struct {
+				Recipient    string `json:"recipient"`
+				ContextToken string `json:"context_token"`
+			}
+			if err := json.Unmarshal(env.Data, &data); err != nil {
+				conn.Send(relay.NewAck(env.ReqID, false, "", "invalid data"))
+				return
+			}
+
+			inst, ok := s.BotManager.GetInstance(conn.BotID)
+			if !ok {
+				conn.Send(relay.NewAck(env.ReqID, false, "", "bot not connected"))
+				return
+			}
+
+			cfg, err := inst.Provider.GetConfig(context.Background(), data.Recipient, data.ContextToken)
+			if err != nil {
+				conn.Send(relay.NewAck(env.ReqID, false, "", err.Error()))
+				return
+			}
+			conn.Send(relay.NewEnvelope("config", cfg))
+
 		default:
 			conn.Send(relay.NewEnvelope("error", relay.ErrorData{
 				Code: "unknown_type", Message: "unknown message type: " + env.Type,

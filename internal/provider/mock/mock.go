@@ -56,6 +56,12 @@ func (p *Provider) Send(_ context.Context, msg provider.OutboundMessage) (string
 	return "mock-client-id", nil
 }
 
+func (p *Provider) SendTyping(_ context.Context, _, _ string, _ bool) error { return nil }
+
+func (p *Provider) GetConfig(_ context.Context, _, _ string) (*provider.BotConfig, error) {
+	return &provider.BotConfig{TypingTicket: "mock-ticket"}, nil
+}
+
 // SimulateInbound injects a fake inbound message for testing.
 func (p *Provider) SimulateInbound(msg provider.InboundMessage) {
 	p.mu.Lock()

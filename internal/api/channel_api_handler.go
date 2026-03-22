@@ -152,6 +152,79 @@ func (s *Server) handleChannelSend(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// POST /api/channel/typing?key=xxx
+func (s *Server) handleChannelTyping(w http.ResponseWriter, r *http.Request) {
+	ch, err := s.authenticateChannel(r)
+	if ch == nil {
+		if err != nil {
+			jsonError(w, "invalid key", http.StatusUnauthorized)
+		} else {
+			jsonError(w, "api key required", http.StatusUnauthorized)
+		}
+		return
+	}
+
+	var req struct {
+		Recipient string `json:"recipient"`
+		Ticket    string `json:"ticket"`
+		Status    string `json:"status"` // "typing" or "cancel"
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	inst, ok := s.BotManager.GetInstance(ch.BotID)
+	if !ok {
+		jsonError(w, "bot not connected", http.StatusServiceUnavailable)
+		return
+	}
+
+	typing := req.Status != "cancel"
+	if err := inst.Provider.SendTyping(context.Background(), req.Recipient, req.Ticket, typing); err != nil {
+		jsonError(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	jsonOK(w)
+}
+
+// POST /api/channel/config?key=xxx
+func (s *Server) handleChannelConfig(w http.ResponseWriter, r *http.Request) {
+	ch, err := s.authenticateChannel(r)
+	if ch == nil {
+		if err != nil {
+			jsonError(w, "invalid key", http.StatusUnauthorized)
+		} else {
+			jsonError(w, "api key required", http.StatusUnauthorized)
+		}
+		return
+	}
+
+	var req struct {
+		Recipient    string `json:"recipient"`
+		ContextToken string `json:"context_token"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	inst, ok := s.BotManager.GetInstance(ch.BotID)
+	if !ok {
+		jsonError(w, "bot not connected", http.StatusServiceUnavailable)
+		return
+	}
+
+	cfg, err := inst.Provider.GetConfig(context.Background(), req.Recipient, req.ContextToken)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(cfg)
+}
+
 // GET /api/channel/status?key=xxx
 func (s *Server) handleChannelStatus(w http.ResponseWriter, r *http.Request) {
 	ch, err := s.authenticateChannel(r)

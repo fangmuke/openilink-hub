@@ -63,6 +63,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/ws", s.handleWebSocket)
 	mux.HandleFunc("GET /api/channel/messages", s.handleChannelMessages)
 	mux.HandleFunc("POST /api/channel/send", s.handleChannelSend)
+	mux.HandleFunc("POST /api/channel/typing", s.handleChannelTyping)
+	mux.HandleFunc("POST /api/channel/config", s.handleChannelConfig)
 	mux.HandleFunc("GET /api/channel/status", s.handleChannelStatus)
 
 	// --- Protected routes ---

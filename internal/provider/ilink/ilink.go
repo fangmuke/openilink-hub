@@ -130,6 +130,30 @@ func (p *Provider) Send(ctx context.Context, msg provider.OutboundMessage) (stri
 	return p.client.Push(ctx, recipient, msg.Text)
 }
 
+func (p *Provider) SendTyping(ctx context.Context, recipient, ticket string, typing bool) error {
+	status := ilink.Typing
+	if !typing {
+		status = ilink.CancelTyping
+	}
+	if recipient == "" {
+		recipient = p.creds.ILinkUserID
+	}
+	return p.client.SendTyping(ctx, recipient, ticket, status)
+}
+
+func (p *Provider) GetConfig(ctx context.Context, recipient, contextToken string) (*provider.BotConfig, error) {
+	if recipient == "" {
+		recipient = p.creds.ILinkUserID
+	}
+	resp, err := p.client.GetConfig(ctx, recipient, contextToken)
+	if err != nil {
+		return nil, err
+	}
+	return &provider.BotConfig{
+		TypingTicket: resp.TypingTicket,
+	}, nil
+}
+
 func convertInbound(msg ilink.WeixinMessage) provider.InboundMessage {
 	var items []provider.MessageItem
 	for _, item := range msg.ItemList {

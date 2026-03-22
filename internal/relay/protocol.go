@@ -81,6 +81,7 @@ type SendTextData struct {
 
 type SendTypingData struct {
 	Recipient string `json:"recipient"`
+	Ticket    string `json:"ticket"`
 	Status    string `json:"status"` // "typing" or "cancel"
 }
 

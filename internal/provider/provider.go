@@ -12,7 +12,14 @@ type Provider interface {
 	Start(ctx context.Context, opts StartOptions) error
 	Stop()
 	Send(ctx context.Context, msg OutboundMessage) (string, error)
+	SendTyping(ctx context.Context, recipient, ticket string, typing bool) error
+	GetConfig(ctx context.Context, recipient, contextToken string) (*BotConfig, error)
 	Status() string
+}
+
+// BotConfig holds provider-specific configuration (e.g. typing ticket).
+type BotConfig struct {
+	TypingTicket string `json:"typing_ticket,omitempty"`
 }
 
 // Binder is an optional interface for providers that support QR/interactive binding.
