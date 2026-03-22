@@ -13,7 +13,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-COPY --from=frontend /app/dist ./internal/web/dist
+COPY --from=frontend /app/internal/web/dist ./internal/web/dist
 RUN CGO_ENABLED=0 go build -o /openilink-hub .
 
 # --- Runtime ---
