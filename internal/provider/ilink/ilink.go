@@ -200,10 +200,13 @@ func (p *Provider) DownloadMedia(ctx context.Context, encryptQueryParam, aesKey 
 	return p.client.DownloadFile(ctx, encryptQueryParam, aesKey)
 }
 
-func (p *Provider) DownloadVoice(ctx context.Context, encryptQueryParam, aesKey string, _ int) ([]byte, error) {
-	return p.client.DownloadVoice(ctx, &ilink.CDNMedia{
-		EncryptQueryParam: encryptQueryParam,
-		AESKey:            aesKey,
+func (p *Provider) DownloadVoice(ctx context.Context, encryptQueryParam, aesKey string, sampleRate int) ([]byte, error) {
+	return p.client.DownloadVoice(ctx, &ilink.VoiceItem{
+		Media: &ilink.CDNMedia{
+			EncryptQueryParam: encryptQueryParam,
+			AESKey:            aesKey,
+		},
+		SampleRate: sampleRate,
 	})
 }
 
