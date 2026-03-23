@@ -2,10 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/openilink/openilink-hub/internal/auth"
+	"github.com/openilink/openilink-hub/internal/database"
 )
 
 func (s *Server) handleRetryMedia(w http.ResponseWriter, r *http.Request) {
@@ -117,10 +119,14 @@ func (s *Server) handleWebhookLogs(w http.ResponseWriter, r *http.Request) {
 
 	logs, err := s.DB.ListWebhookLogs(botID, channelID, limit)
 	if err != nil {
+		slog.Error("list webhook logs failed", "bot", botID, "channel", channelID, "err", err)
 		jsonError(w, "query failed", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	if logs == nil {
+		logs = []database.WebhookLog{}
+	}
 	json.NewEncoder(w).Encode(logs)
 }
