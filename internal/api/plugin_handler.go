@@ -138,6 +138,7 @@ func (s *Server) handleReviewPlugin(w http.ResponseWriter, r *http.Request) {
 
 	var req struct {
 		Status string `json:"status"` // "approved" or "rejected"
+		Reason string `json:"reason"` // rejection reason (optional)
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonError(w, "invalid request", http.StatusBadRequest)
@@ -148,7 +149,7 @@ func (s *Server) handleReviewPlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.DB.UpdatePluginStatus(id, req.Status, userID); err != nil {
+	if err := s.DB.UpdatePluginStatus(id, req.Status, userID, req.Reason); err != nil {
 		jsonError(w, "update failed", http.StatusInternalServerError)
 		return
 	}
@@ -174,7 +175,8 @@ func (s *Server) handleInstallPlugin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.DB.IncrPluginInstallCount(id)
+	userID := auth.UserIDFromContext(r.Context())
+	s.DB.RecordPluginInstall(id, userID)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{

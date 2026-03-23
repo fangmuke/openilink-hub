@@ -80,8 +80,8 @@ export const api = {
   getPlugin: (id: string) => request<any>(`/api/plugins/${id}`),
   submitPlugin: (github_url: string) => request<any>("/api/plugins/submit", { method: "POST", body: JSON.stringify({ github_url }) }),
   installPlugin: (id: string) => request<any>(`/api/plugins/${id}/install`, { method: "POST" }),
-  reviewPlugin: (id: string, status: string) =>
-    request(`/api/admin/plugins/${id}/review`, { method: "PUT", body: JSON.stringify({ status }) }),
+  reviewPlugin: (id: string, status: string, reason?: string) =>
+    request(`/api/admin/plugins/${id}/review`, { method: "PUT", body: JSON.stringify({ status, reason: reason || "" }) }),
   deletePlugin: (id: string) => request(`/api/admin/plugins/${id}`, { method: "DELETE" }),
 
   // Admin: Dashboard

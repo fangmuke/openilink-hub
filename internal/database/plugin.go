@@ -17,11 +17,16 @@ type Plugin struct {
 	Script       string          `json:"script,omitempty"`
 	ConfigSchema json.RawMessage `json:"config_schema"`
 	Status       string          `json:"status"`
+	RejectReason string          `json:"reject_reason,omitempty"`
 	SubmittedBy  string          `json:"submitted_by"`
 	ReviewedBy   string          `json:"reviewed_by,omitempty"`
 	InstallCount int             `json:"install_count"`
 	CreatedAt    int64           `json:"created_at"`
 	UpdatedAt    int64           `json:"updated_at"`
+
+	// Joined fields (not in DB, populated by queries)
+	SubmitterName string `json:"submitter_name,omitempty"`
+	ReviewerName  string `json:"reviewer_name,omitempty"`
 }
 
 // ConfigField describes a configurable parameter for a plugin.
@@ -31,16 +36,22 @@ type ConfigField struct {
 	Description string `json:"description"`
 }
 
-const pluginSelectCols = `id, name, description, author, version, github_url, commit_hash,
-	script, config_schema, status, submitted_by, reviewed_by, install_count,
-	EXTRACT(EPOCH FROM created_at)::BIGINT, EXTRACT(EPOCH FROM updated_at)::BIGINT`
+const pluginSelectCols = `p.id, p.name, p.description, p.author, p.version, p.github_url, p.commit_hash,
+	p.script, p.config_schema, p.status, p.reject_reason, p.submitted_by, p.reviewed_by, p.install_count,
+	EXTRACT(EPOCH FROM p.created_at)::BIGINT, EXTRACT(EPOCH FROM p.updated_at)::BIGINT,
+	COALESCE(su.username, ''), COALESCE(ru.username, '')`
+
+const pluginFromJoin = ` FROM plugins p
+	LEFT JOIN users su ON su.id = p.submitted_by
+	LEFT JOIN users ru ON ru.id = p.reviewed_by`
 
 func scanPlugin(scanner interface{ Scan(...any) error }) (*Plugin, error) {
 	p := &Plugin{}
 	err := scanner.Scan(&p.ID, &p.Name, &p.Description, &p.Author, &p.Version,
 		&p.GithubURL, &p.CommitHash, &p.Script, &p.ConfigSchema,
-		&p.Status, &p.SubmittedBy, &p.ReviewedBy, &p.InstallCount,
-		&p.CreatedAt, &p.UpdatedAt)
+		&p.Status, &p.RejectReason, &p.SubmittedBy, &p.ReviewedBy, &p.InstallCount,
+		&p.CreatedAt, &p.UpdatedAt,
+		&p.SubmitterName, &p.ReviewerName)
 	if err != nil {
 		return nil, err
 	}
@@ -60,17 +71,17 @@ func (db *DB) CreatePlugin(p *Plugin) (*Plugin, error) {
 }
 
 func (db *DB) GetPlugin(id string) (*Plugin, error) {
-	return scanPlugin(db.QueryRow("SELECT "+pluginSelectCols+" FROM plugins WHERE id = $1", id))
+	return scanPlugin(db.QueryRow("SELECT "+pluginSelectCols+pluginFromJoin+" WHERE p.id = $1", id))
 }
 
 func (db *DB) ListPlugins(status string) ([]Plugin, error) {
-	query := "SELECT " + pluginSelectCols + " FROM plugins"
+	query := "SELECT " + pluginSelectCols + pluginFromJoin
 	var args []any
 	if status != "" {
-		query += " WHERE status = $1"
+		query += " WHERE p.status = $1"
 		args = append(args, status)
 	}
-	query += " ORDER BY install_count DESC, created_at DESC"
+	query += " ORDER BY p.install_count DESC, p.created_at DESC"
 	rows, err := db.Query(query, args...)
 	if err != nil {
 		return nil, err
@@ -87,18 +98,25 @@ func (db *DB) ListPlugins(status string) ([]Plugin, error) {
 	return plugins, rows.Err()
 }
 
-func (db *DB) UpdatePluginStatus(id, status, reviewedBy string) error {
-	_, err := db.Exec("UPDATE plugins SET status = $1, reviewed_by = $2, updated_at = NOW() WHERE id = $3",
-		status, reviewedBy, id)
+func (db *DB) UpdatePluginStatus(id, status, reviewedBy, reason string) error {
+	_, err := db.Exec("UPDATE plugins SET status = $1, reviewed_by = $2, reject_reason = $3, updated_at = NOW() WHERE id = $4",
+		status, reviewedBy, reason, id)
 	return err
 }
 
-func (db *DB) IncrPluginInstallCount(id string) error {
-	_, err := db.Exec("UPDATE plugins SET install_count = install_count + 1 WHERE id = $1", id)
+func (db *DB) RecordPluginInstall(pluginID, userID string) error {
+	_, err := db.Exec(`INSERT INTO plugin_installs (plugin_id, user_id) VALUES ($1, $2)
+		ON CONFLICT (plugin_id, user_id) DO UPDATE SET installed_at = NOW()`, pluginID, userID)
+	if err != nil {
+		return err
+	}
+	// Update count from actual installs
+	_, err = db.Exec(`UPDATE plugins SET install_count = (SELECT COUNT(*) FROM plugin_installs WHERE plugin_id = $1) WHERE id = $1`, pluginID)
 	return err
 }
 
 func (db *DB) DeletePlugin(id string) error {
+	db.Exec("DELETE FROM plugin_installs WHERE plugin_id = $1", id)
 	_, err := db.Exec("DELETE FROM plugins WHERE id = $1", id)
 	return err
 }
