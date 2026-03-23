@@ -3,7 +3,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
 import { api } from "../lib/api";
-import { Link2, Unlink, Save, Trash2 } from "lucide-react";
+import { Link2, Unlink, Save, Trash2, KeyRound, Plus } from "lucide-react";
 
 const providerLabels: Record<string, string> = {
   github: "GitHub",
@@ -112,6 +112,7 @@ export function SettingsPage() {
       )}
 
       <ChangePasswordSection />
+      <PasskeySection />
 
       {user.role === "admin" && <AdminDashboard />}
       {user.role === "admin" && <UserManagementSection />}
@@ -120,6 +121,118 @@ export function SettingsPage() {
       {user.role === "admin" && <OAuthConfigSection />}
     </div>
   );
+}
+
+function PasskeySection() {
+  const [passkeys, setPasskeys] = useState<any[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState("");
+
+  async function load() {
+    try { setPasskeys(await api.listPasskeys() || []); } catch {}
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function handleAdd() {
+    setAdding(true);
+    setError("");
+    try {
+      // Step 1: Get registration options from server
+      const options = await api.passkeyBindBegin();
+
+      // Step 2: Convert base64url fields for WebAuthn API
+      options.publicKey.challenge = base64urlToBuffer(options.publicKey.challenge);
+      options.publicKey.user.id = base64urlToBuffer(options.publicKey.user.id);
+      if (options.publicKey.excludeCredentials) {
+        options.publicKey.excludeCredentials = options.publicKey.excludeCredentials.map((c: any) => ({
+          ...c, id: base64urlToBuffer(c.id),
+        }));
+      }
+
+      // Step 3: Create credential via browser
+      const credential = await navigator.credentials.create(options) as PublicKeyCredential;
+      if (!credential) throw new Error("cancelled");
+
+      const response = credential.response as AuthenticatorAttestationResponse;
+
+      // Step 4: Send to server
+      const body = JSON.stringify({
+        id: credential.id,
+        rawId: bufferToBase64url(credential.rawId),
+        type: credential.type,
+        response: {
+          attestationObject: bufferToBase64url(response.attestationObject),
+          clientDataJSON: bufferToBase64url(response.clientDataJSON),
+        },
+      });
+
+      await api.passkeyBindFinishRaw(body);
+      load();
+    } catch (err: any) {
+      if (err.name !== "NotAllowedError") setError(err.message || "注册失败");
+    }
+    setAdding(false);
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm("删除此 Passkey？")) return;
+    try { await api.deletePasskey(id); load(); } catch (err: any) { setError(err.message); }
+  }
+
+  return (
+    <Card className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium">Passkey</h3>
+        <Button variant="outline" size="sm" className="text-xs h-7" onClick={handleAdd} disabled={adding}>
+          <Plus className="w-3 h-3 mr-1" /> {adding ? "注册中..." : "添加 Passkey"}
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        使用指纹、Face ID 或安全密钥登录，无需密码。
+      </p>
+      {error && <p className="text-[10px] text-destructive">{error}</p>}
+      {passkeys.length === 0 ? (
+        <p className="text-[10px] text-muted-foreground">暂未绑定任何 Passkey</p>
+      ) : (
+        <div className="space-y-1">
+          {passkeys.map((pk) => (
+            <div key={pk.id} className="flex items-center justify-between p-2 rounded-lg border bg-background">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-muted-foreground" />
+                <div>
+                  <p className="text-xs font-mono">{pk.id.slice(0, 16)}...</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {new Date(pk.created_at * 1000).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" className="h-6" onClick={() => handleDelete(pk.id)}>
+                <Trash2 className="w-3 h-3 text-destructive" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// WebAuthn helpers
+function base64urlToBuffer(base64url: string): ArrayBuffer {
+  const base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = base64.length % 4 === 0 ? "" : "=".repeat(4 - (base64.length % 4));
+  const binary = atob(base64 + pad);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+function bufferToBase64url(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
 function ChangePasswordSection() {

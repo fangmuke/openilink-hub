@@ -86,6 +86,12 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("PUT /api/me/profile", s.handleUpdateProfile)
 	protected.HandleFunc("PUT /api/me/password", s.handleChangePassword)
 
+	// Passkey binding (authenticated)
+	protected.HandleFunc("GET /api/me/passkeys", s.handleListPasskeys)
+	protected.HandleFunc("POST /api/me/passkeys/register/begin", s.handlePasskeyBindBegin)
+	protected.HandleFunc("POST /api/me/passkeys/register/finish", s.handlePasskeyBindFinish)
+	protected.HandleFunc("DELETE /api/me/passkeys/{id}", s.handleDeletePasskey)
+
 	// OAuth account binding (authenticated)
 	protected.HandleFunc("GET /api/me/linked-accounts", s.handleOAuthAccounts)
 	protected.HandleFunc("GET /api/me/linked-accounts/{provider}/bind", s.handleOAuthBind)

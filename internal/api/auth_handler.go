@@ -284,6 +284,94 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w)
 }
 
+// --- Passkey binding (authenticated) ---
+
+func (s *Server) handleListPasskeys(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	creds, err := s.DB.GetCredentialsByUserID(userID)
+	if err != nil {
+		jsonError(w, "list failed", http.StatusInternalServerError)
+		return
+	}
+	type passkeyResp struct {
+		ID        string `json:"id"`
+		CreatedAt int64  `json:"created_at"`
+	}
+	result := make([]passkeyResp, len(creds))
+	for i, c := range creds {
+		result[i] = passkeyResp{ID: c.ID, CreatedAt: c.CreatedAt}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+func (s *Server) handlePasskeyBindBegin(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	user, err := s.DB.GetUserByID(userID)
+	if err != nil {
+		jsonError(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	waUser, _ := auth.LoadWebAuthnUser(s.DB, user)
+	options, session, err := s.WebAuthn.BeginRegistration(waUser)
+	if err != nil {
+		jsonError(w, "webauthn begin failed", http.StatusInternalServerError)
+		return
+	}
+
+	s.SessionStore.Set("bind:"+user.ID, session)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(options)
+}
+
+func (s *Server) handlePasskeyBindFinish(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	user, err := s.DB.GetUserByID(userID)
+	if err != nil {
+		jsonError(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	session := s.SessionStore.Get("bind:" + user.ID)
+	if session == nil {
+		jsonError(w, "no registration session", http.StatusBadRequest)
+		return
+	}
+
+	waUser, _ := auth.LoadWebAuthnUser(s.DB, user)
+	cred, err := s.WebAuthn.FinishRegistration(waUser, *session, r)
+	if err != nil {
+		jsonError(w, "registration failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	transportsJSON, _ := json.Marshal(cred.Transport)
+	if err := s.DB.SaveCredential(&database.Credential{
+		ID:              string(cred.ID),
+		UserID:          user.ID,
+		PublicKey:       cred.PublicKey,
+		AttestationType: cred.AttestationType,
+		Transport:       string(transportsJSON),
+		SignCount:       cred.Authenticator.SignCount,
+	}); err != nil {
+		jsonError(w, "save credential failed", http.StatusInternalServerError)
+		return
+	}
+
+	jsonOK(w)
+}
+
+func (s *Server) handleDeletePasskey(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	credID := r.PathValue("id")
+	if err := s.DB.DeleteCredential(credID, userID); err != nil {
+		jsonError(w, "delete failed", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w)
+}
+
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromContext(r.Context())
 	user, err := s.DB.GetUserByID(userID)

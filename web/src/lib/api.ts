@@ -24,6 +24,16 @@ export const api = {
   me: () => request<{ id: string; username: string; display_name: string; role: string }>("/api/me"),
   info: () => request<{ ai: boolean }>("/api/info"),
 
+  // Passkeys
+  listPasskeys: () => request<any[]>("/api/me/passkeys"),
+  passkeyBindBegin: () => request<any>("/api/me/passkeys/register/begin", { method: "POST" }),
+  passkeyBindFinishRaw: (body: string) =>
+    fetch("/api/me/passkeys/register/finish", {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" }, body,
+    }).then(async (r) => { if (!r.ok) throw new Error((await r.json()).error); }),
+  deletePasskey: (id: string) => request(`/api/me/passkeys/${id}`, { method: "DELETE" }),
+
   // Profile
   updateProfile: (data: { display_name?: string; email?: string }) =>
     request("/api/me/profile", { method: "PUT", body: JSON.stringify(data) }),
