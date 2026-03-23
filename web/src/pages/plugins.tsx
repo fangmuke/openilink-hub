@@ -132,28 +132,45 @@ function PluginCard({ plugin, onRefresh, isAdmin, isLoggedIn, mode }: {
 
   const s = statusMap[plugin.status] || statusMap.pending;
   const config = plugin.config_schema || [];
+  const grants = (plugin.grant_perms || "").split(",").filter(Boolean);
+  const matchTypes = plugin.match_types || "*";
+  const connectDomains = plugin.connect_domains || "*";
+  const riskLevel = connectDomains === "*" && grants.includes("reply") ? "high"
+    : connectDomains === "*" || grants.includes("reply") ? "medium" : "low";
+  const riskColors = { low: "text-primary", medium: "text-yellow-500", high: "text-destructive" };
+  const riskLabels = { low: "低风险", medium: "中风险", high: "高风险" };
 
   return (
     <Card className="space-y-2">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
+            {plugin.icon && <span>{plugin.icon}</span>}
             <span className="font-medium text-sm">{plugin.name}</span>
             <Badge variant={s.variant} className="text-[10px]">{s.label}</Badge>
             <span className="text-[10px] text-muted-foreground">v{plugin.version}</span>
+            {plugin.license && <span className="text-[10px] text-muted-foreground">{plugin.license}</span>}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">{plugin.description}</p>
           <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground flex-wrap">
             <span>by {plugin.author || "anonymous"}</span>
+            {plugin.namespace && <span className="font-mono">{plugin.namespace}</span>}
             {plugin.submitter_name && <span>提交：{plugin.submitter_name}</span>}
             {plugin.reviewer_name && <span>审核：{plugin.reviewer_name}</span>}
             <span>{plugin.install_count} 次安装</span>
-            {plugin.github_url && (
-              <a href={plugin.github_url} target="_blank" rel="noopener" className="flex items-center gap-0.5 hover:text-primary">
+            {(plugin.github_url || plugin.homepage) && (
+              <a href={plugin.homepage || plugin.github_url} target="_blank" rel="noopener" className="flex items-center gap-0.5 hover:text-primary">
                 <Github className="w-3 h-3" /> 源码
               </a>
             )}
             {plugin.commit_hash && <span className="font-mono">{plugin.commit_hash.slice(0, 7)}</span>}
+          </div>
+          {/* Security info — always show for review, compact for marketplace */}
+          <div className="flex items-center gap-2 mt-1 text-[10px] flex-wrap">
+            <span className={riskColors[riskLevel]}>{riskLabels[riskLevel]}</span>
+            <span className="text-muted-foreground">权限: {grants.length > 0 ? grants.join(", ") : "none"}</span>
+            <span className="text-muted-foreground">消息: {matchTypes}</span>
+            <span className="text-muted-foreground">域名: {connectDomains}</span>
           </div>
           {plugin.reject_reason && (
             <p className="text-[10px] text-destructive mt-0.5">拒绝原因：{plugin.reject_reason}</p>

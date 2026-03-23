@@ -8,14 +8,23 @@ A webhook plugin is a JavaScript file that transforms how messages are forwarded
 
 ## Plugin Format
 
-Every plugin is a `.js` file with metadata comments and exported functions:
+Every plugin is a `.js` file with a `==WebhookPlugin==` metadata block and exported functions:
 
 ```javascript
-// @name Plugin Name (required)
-// @description What this plugin does
-// @author Author name
-// @version 1.0.0
-// @config param_name type "Human-readable description"
+// ==WebhookPlugin==
+// @name         Plugin Name (required)
+// @namespace    github.com/yourname
+// @version      1.0.0
+// @description  What this plugin does
+// @author       Your Name
+// @license      MIT
+// @homepage     https://github.com/yourname/plugin
+// @icon         🔔
+// @match        text,image
+// @connect      api.example.com
+// @grant        reply
+// @config       webhook_url string "Target webhook URL"
+// ==/WebhookPlugin==
 
 function onRequest(ctx) {
   // Called BEFORE the HTTP request is sent
@@ -30,13 +39,53 @@ function onResponse(ctx) {
 
 ## Metadata Fields
 
-| Field | Required | Description |
-|---|---|---|
-| `@name` | Yes | Plugin display name |
-| `@description` | No | Short description |
-| `@author` | No | Author name |
-| `@version` | No | Semver version (default: 1.0.0) |
-| `@config` | No | Configurable parameter (can have multiple) |
+| Field | Required | Default | Description |
+|---|---|---|---|
+| `@name` | Yes | — | Plugin display name |
+| `@namespace` | No | — | Unique identifier (e.g. github.com/user) |
+| `@version` | No | 1.0.0 | Semver version |
+| `@description` | No | — | Short description |
+| `@author` | No | — | Author name |
+| `@license` | No | — | License (MIT, Apache-2.0, etc.) |
+| `@homepage` | No | — | Project URL |
+| `@icon` | No | — | Emoji icon for marketplace display |
+| `@match` | No | `*` | Message types to trigger on (comma-separated: text,image,voice,video,file) |
+| `@connect` | No | `*` | Allowed URL domains for ctx.req.url (comma-separated) |
+| `@grant` | No | all | Required permissions: `reply`, `skip`, `none` (comma-separated) |
+| `@config` | No | — | Configurable parameter (can have multiple) |
+
+### @match — Message Type Filter
+
+Controls which message types trigger the plugin. Default `*` means all types.
+
+```
+// @match  text              only text messages
+// @match  text,image        text and image messages
+// @match  *                 all message types (default)
+```
+
+### @connect — URL Domain Whitelist
+
+Restricts which domains `ctx.req.url` can be changed to. Default `*` allows any domain.
+
+```
+// @connect  open.feishu.cn      only allow Feishu
+// @connect  api.openai.com      only allow OpenAI
+// @connect  *                   allow any domain (default, review carefully)
+```
+
+If a script modifies `ctx.req.url` to a domain not in the whitelist, execution is blocked.
+
+### @grant — Permission Declaration
+
+Declares which APIs the plugin needs. If `@grant` is not specified, all APIs are available (backward compatible). If specified, only declared APIs work.
+
+```
+// @grant  none          no side effects (reply/skip both blocked)
+// @grant  reply         can call reply()
+// @grant  skip          can call skip()
+// @grant  reply,skip    can call both
+```
 
 ### @config Syntax
 
@@ -45,13 +94,6 @@ function onResponse(ctx) {
 ```
 
 Types: `string`, `string?` (optional), `number`, `bool`
-
-Example:
-```javascript
-// @config webhook_url string "Target webhook URL"
-// @config secret string? "Signing secret (optional)"
-// @config max_retries number "Maximum retry count"
-```
 
 ## Context Object (ctx)
 
@@ -119,15 +161,22 @@ Each item has:
 
 ## Examples
 
-### 1. Notification Forward (onRequest)
+### 1. Notification Forward (onRequest only)
 
-Transforms the request body to match the target service's format. Works for Feishu, DingTalk, Slack, Discord, WeCom — just change the JSON structure.
+Transforms the request body. Works for Feishu, DingTalk, Slack, Discord, WeCom — just change the JSON structure.
 
 ```javascript
-// @name Feishu Notification
-// @description Forward WeChat messages to Feishu group bot
-// @author openilink
-// @version 1.0.0
+// ==WebhookPlugin==
+// @name         Feishu Notification
+// @namespace    github.com/openilink
+// @version      1.0.0
+// @description  Forward WeChat messages to Feishu group bot
+// @author       openilink
+// @icon         🔔
+// @match        text,image,file
+// @connect      open.feishu.cn
+// @grant        none
+// ==/WebhookPlugin==
 
 function onRequest(ctx) {
   ctx.req.body = JSON.stringify({
@@ -141,15 +190,21 @@ function onRequest(ctx) {
 
 ### 2. AI Auto-Reply (onRequest + onResponse + reply)
 
-Demonstrates the full two-phase flow: transform the request, then parse the response and reply back through the bot.
+Full two-phase flow: transform request, parse response, reply through bot.
 
 ```javascript
-// @name ChatGPT Auto-Reply
-// @description Forward to OpenAI API and auto-reply
-// @author openilink
-// @version 1.0.0
-// @config api_key string "OpenAI API Key"
-// @config model string? "Model name (default: gpt-4o-mini)"
+// ==WebhookPlugin==
+// @name         ChatGPT Auto-Reply
+// @namespace    github.com/openilink
+// @version      1.0.0
+// @description  Forward to OpenAI API and auto-reply
+// @author       openilink
+// @icon         🤖
+// @match        text
+// @connect      api.openai.com
+// @grant        reply
+// @config       api_key string "OpenAI API Key"
+// ==/WebhookPlugin==
 
 function onRequest(ctx) {
   ctx.req.url = "https://api.openai.com/v1/chat/completions";
@@ -176,11 +231,17 @@ function onResponse(ctx) {
 Uses `skip()` to cancel delivery when conditions aren't met.
 
 ```javascript
-// @name Keyword Filter
-// @description Only forward messages containing specific keywords
-// @author openilink
-// @version 1.0.0
-// @config keywords string "Keywords, comma-separated"
+// ==WebhookPlugin==
+// @name         Keyword Filter
+// @namespace    github.com/openilink
+// @version      1.0.0
+// @description  Only forward messages containing keywords
+// @author       openilink
+// @icon         🔍
+// @match        text
+// @grant        skip
+// @config       keywords string "Keywords, comma-separated"
+// ==/WebhookPlugin==
 
 function onRequest(ctx) {
   var keywords = ["urgent", "bug", "error", "help"];

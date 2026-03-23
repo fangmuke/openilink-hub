@@ -7,9 +7,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/dop251/goja"
@@ -118,9 +122,61 @@ func runScriptWithTimeout(vm *goja.Runtime, fn goja.Callable, args ...goja.Value
 	return result, err
 }
 
+// parseScriptPerms extracts @grant, @match, @connect from the script metadata.
+func parseScriptPerms(script string) (grants map[string]bool, matchTypes map[string]bool, connectDomains map[string]bool) {
+	grants = map[string]bool{}
+	matchTypes = map[string]bool{"*": true} // default: all
+	connectDomains = map[string]bool{"*": true}
+
+	metaRe := regexp.MustCompile(`//\s*@(\w+)\s+(.+)`)
+	hasGrant, hasMatch, hasConnect := false, false, false
+
+	for _, line := range strings.Split(script, "\n") {
+		m := metaRe.FindStringSubmatch(strings.TrimSpace(line))
+		if m == nil {
+			continue
+		}
+		switch m[1] {
+		case "grant":
+			if !hasGrant {
+				hasGrant = true
+				grants = map[string]bool{}
+			}
+			for _, g := range strings.Split(strings.TrimSpace(m[2]), ",") {
+				grants[strings.TrimSpace(g)] = true
+			}
+		case "match":
+			if !hasMatch {
+				hasMatch = true
+				matchTypes = map[string]bool{}
+			}
+			for _, t := range strings.Split(strings.TrimSpace(m[2]), ",") {
+				matchTypes[strings.TrimSpace(t)] = true
+			}
+		case "connect":
+			if !hasConnect {
+				hasConnect = true
+				connectDomains = map[string]bool{}
+			}
+			for _, d := range strings.Split(strings.TrimSpace(m[2]), ",") {
+				connectDomains[strings.TrimSpace(d)] = true
+			}
+		}
+	}
+	return
+}
+
 func (s *Webhook) runScript(script string, msg webhookPayload, req *reqData, channelID string) (
 	outReq *reqData, outRes *resData, replies []string, skipped bool, err error,
 ) {
+	// Parse permissions from script metadata
+	grants, matchTypes, connectDomains := parseScriptPerms(script)
+
+	// @match enforcement: skip if message type doesn't match
+	if !matchTypes["*"] && !matchTypes[msg.MsgType] {
+		return req, nil, nil, false, nil // pass through without running script
+	}
+
 	vm := goja.New()
 	vm.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
 	vm.SetMaxCallStackSize(scriptMaxCallStack)
@@ -141,12 +197,40 @@ func (s *Webhook) runScript(script string, msg webhookPayload, req *reqData, cha
 		},
 	}
 	vm.Set("ctx", ctx)
-	vm.Set("reply", func(text string) {
-		if len(replies) < scriptMaxReplies {
-			replies = append(replies, text)
-		}
-	})
-	vm.Set("skip", func() { skipped = true })
+
+	// @grant enforcement: only expose granted APIs
+	if grants["reply"] || grants["none"] == false && len(grants) == 0 {
+		// grant reply or no @grant declared (backward compat: all allowed)
+		vm.Set("reply", func(text string) {
+			if len(replies) < scriptMaxReplies {
+				replies = append(replies, text)
+			}
+		})
+	} else {
+		vm.Set("reply", func(text string) {
+			panic(vm.NewGoError(fmt.Errorf("reply() not granted — add @grant reply")))
+		})
+	}
+
+	if grants["skip"] || grants["none"] == false && len(grants) == 0 {
+		vm.Set("skip", func() { skipped = true })
+	} else {
+		vm.Set("skip", func() {
+			panic(vm.NewGoError(fmt.Errorf("skip() not granted — add @grant skip")))
+		})
+	}
+
+	// If @grant none, block both
+	if grants["none"] {
+		vm.Set("reply", func(text string) {
+			panic(vm.NewGoError(fmt.Errorf("reply() blocked by @grant none")))
+		})
+		vm.Set("skip", func() {
+			panic(vm.NewGoError(fmt.Errorf("skip() blocked by @grant none")))
+		})
+	}
+
+	_ = connectDomains // used after script execution
 
 	// Define onRequest/onResponse as top-level functions (with timeout)
 	timer := time.AfterFunc(scriptTimeout, func() {
@@ -174,6 +258,13 @@ func (s *Webhook) runScript(script string, msg webhookPayload, req *reqData, cha
 
 	// Extract modified req from ctx
 	outReq = extractReqFromCtx(vm.Get("ctx").Export(), req)
+
+	// @connect enforcement: validate URL domain
+	if !connectDomains["*"] && outReq.URL != req.URL {
+		if !isDomainAllowed(outReq.URL, connectDomains) {
+			return nil, nil, nil, false, fmt.Errorf("URL domain not in @connect whitelist: %s", outReq.URL)
+		}
+	}
 
 	// Execute HTTP
 	outRes = doHTTP(outReq, channelID)
@@ -377,4 +468,23 @@ func extractReqFromCtx(obj any, fallback *reqData) *reqData {
 		}
 	}
 	return out
+}
+
+// isDomainAllowed checks if a URL's host is in the allowed domains set.
+func isDomainAllowed(rawURL string, allowed map[string]bool) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	host := u.Hostname()
+	if allowed[host] {
+		return true
+	}
+	// Check if any allowed domain is a suffix (e.g. ".feishu.cn" matches "open.feishu.cn")
+	for domain := range allowed {
+		if strings.HasSuffix(host, "."+domain) || host == domain {
+			return true
+		}
+	}
+	return false
 }

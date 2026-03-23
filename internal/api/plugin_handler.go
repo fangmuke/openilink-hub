@@ -76,15 +76,22 @@ func (s *Server) handleSubmitPlugin(w http.ResponseWriter, r *http.Request) {
 	configSchema, _ := json.Marshal(meta.Config)
 
 	plugin, err := s.DB.CreatePlugin(&database.Plugin{
-		Name:         meta.Name,
-		Description:  meta.Description,
-		Author:       meta.Author,
-		Version:      meta.Version,
-		GithubURL:    githubURL,
-		CommitHash:   commitHash,
-		Script:       script,
-		ConfigSchema: configSchema,
-		SubmittedBy:  userID,
+		Name:           meta.Name,
+		Description:    meta.Description,
+		Author:         meta.Author,
+		Version:        meta.Version,
+		Namespace:      meta.Namespace,
+		Icon:           meta.Icon,
+		License:        meta.License,
+		Homepage:       meta.Homepage,
+		MatchTypes:     meta.Match,
+		ConnectDomains: meta.Connect,
+		GrantPerms:     strings.Join(meta.Grant, ","),
+		GithubURL:      githubURL,
+		CommitHash:     commitHash,
+		Script:         script,
+		ConfigSchema:   configSchema,
+		SubmittedBy:    userID,
 	})
 	if err != nil {
 		jsonError(w, "save failed", http.StatusInternalServerError)
@@ -277,6 +284,13 @@ type pluginMeta struct {
 	Description string
 	Author      string
 	Version     string
+	Namespace   string
+	Icon        string
+	License     string
+	Homepage    string
+	Match       string   // comma-separated msg types or "*"
+	Connect     string   // comma-separated domains or "*"
+	Grant       []string // "reply", "skip"
 	Config      []database.ConfigField
 }
 
@@ -284,8 +298,25 @@ var metaRe = regexp.MustCompile(`//\s*@(\w+)\s+(.+)`)
 
 func parsePluginMeta(script string) pluginMeta {
 	var meta pluginMeta
-	for _, line := range strings.Split(script, "\n") {
-		m := metaRe.FindStringSubmatch(strings.TrimSpace(line))
+	// Find metadata block: between ==WebhookPlugin== markers
+	// If no markers, fall back to scanning all lines (backward compat)
+	lines := strings.Split(script, "\n")
+	inBlock := false
+	hasBlock := strings.Contains(script, "==WebhookPlugin==")
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if hasBlock {
+			if strings.Contains(trimmed, "// ==WebhookPlugin==") || strings.Contains(trimmed, "// ==/WebhookPlugin==") {
+				inBlock = !inBlock
+				continue
+			}
+			if !inBlock {
+				continue
+			}
+		}
+
+		m := metaRe.FindStringSubmatch(trimmed)
 		if m == nil {
 			continue
 		}
@@ -299,8 +330,26 @@ func parsePluginMeta(script string) pluginMeta {
 			meta.Author = val
 		case "version":
 			meta.Version = val
+		case "namespace":
+			meta.Namespace = val
+		case "icon":
+			meta.Icon = val
+		case "license":
+			meta.License = val
+		case "homepage":
+			meta.Homepage = val
+		case "match":
+			meta.Match = val
+		case "connect":
+			meta.Connect = val
+		case "grant":
+			for _, g := range strings.Split(val, ",") {
+				g = strings.TrimSpace(g)
+				if g != "" {
+					meta.Grant = append(meta.Grant, g)
+				}
+			}
 		case "config":
-			// Format: name type "description"
 			parts := strings.SplitN(val, " ", 3)
 			if len(parts) >= 2 {
 				desc := ""

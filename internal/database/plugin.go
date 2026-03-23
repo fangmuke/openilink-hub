@@ -12,6 +12,13 @@ type Plugin struct {
 	Description  string          `json:"description"`
 	Author       string          `json:"author"`
 	Version      string          `json:"version"`
+	Namespace    string          `json:"namespace,omitempty"`
+	Icon         string          `json:"icon,omitempty"`
+	License      string          `json:"license,omitempty"`
+	Homepage     string          `json:"homepage,omitempty"`
+	MatchTypes   string          `json:"match_types"`    // comma-separated: "text,image" or "*"
+	ConnectDomains string       `json:"connect_domains"` // comma-separated: "open.feishu.cn" or "*"
+	GrantPerms   string          `json:"grant_perms"`     // comma-separated: "reply,skip" or "none"
 	GithubURL    string          `json:"github_url"`
 	CommitHash   string          `json:"commit_hash"`
 	Script       string          `json:"script,omitempty"`
@@ -36,8 +43,11 @@ type ConfigField struct {
 	Description string `json:"description"`
 }
 
-const pluginSelectCols = `p.id, p.name, p.description, p.author, p.version, p.github_url, p.commit_hash,
-	p.script, p.config_schema, p.status, p.reject_reason, p.submitted_by, p.reviewed_by, p.install_count,
+const pluginSelectCols = `p.id, p.name, p.description, p.author, p.version,
+	p.namespace, p.icon, p.license, p.homepage,
+	p.match_types, p.connect_domains, p.grant_perms,
+	p.github_url, p.commit_hash, p.script, p.config_schema,
+	p.status, p.reject_reason, p.submitted_by, p.reviewed_by, p.install_count,
 	EXTRACT(EPOCH FROM p.created_at)::BIGINT, EXTRACT(EPOCH FROM p.updated_at)::BIGINT,
 	COALESCE(su.username, ''), COALESCE(ru.username, '')`
 
@@ -48,6 +58,8 @@ const pluginFromJoin = ` FROM plugins p
 func scanPlugin(scanner interface{ Scan(...any) error }) (*Plugin, error) {
 	p := &Plugin{}
 	err := scanner.Scan(&p.ID, &p.Name, &p.Description, &p.Author, &p.Version,
+		&p.Namespace, &p.Icon, &p.License, &p.Homepage,
+		&p.MatchTypes, &p.ConnectDomains, &p.GrantPerms,
 		&p.GithubURL, &p.CommitHash, &p.Script, &p.ConfigSchema,
 		&p.Status, &p.RejectReason, &p.SubmittedBy, &p.ReviewedBy, &p.InstallCount,
 		&p.CreatedAt, &p.UpdatedAt,
@@ -60,9 +72,21 @@ func scanPlugin(scanner interface{ Scan(...any) error }) (*Plugin, error) {
 
 func (db *DB) CreatePlugin(p *Plugin) (*Plugin, error) {
 	p.ID = uuid.New().String()
-	_, err := db.Exec(`INSERT INTO plugins (id, name, description, author, version, github_url, commit_hash, script, config_schema, status, submitted_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', $10)`,
-		p.ID, p.Name, p.Description, p.Author, p.Version, p.GithubURL, p.CommitHash, p.Script, p.ConfigSchema, p.SubmittedBy)
+	if p.MatchTypes == "" {
+		p.MatchTypes = "*"
+	}
+	if p.ConnectDomains == "" {
+		p.ConnectDomains = "*"
+	}
+	_, err := db.Exec(`INSERT INTO plugins
+		(id, name, description, author, version, namespace, icon, license, homepage,
+		 match_types, connect_domains, grant_perms,
+		 github_url, commit_hash, script, config_schema, status, submitted_by)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'pending',$17)`,
+		p.ID, p.Name, p.Description, p.Author, p.Version,
+		p.Namespace, p.Icon, p.License, p.Homepage,
+		p.MatchTypes, p.ConnectDomains, p.GrantPerms,
+		p.GithubURL, p.CommitHash, p.Script, p.ConfigSchema, p.SubmittedBy)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +134,6 @@ func (db *DB) RecordPluginInstall(pluginID, userID string) error {
 	if err != nil {
 		return err
 	}
-	// Update count from actual installs
 	_, err = db.Exec(`UPDATE plugins SET install_count = (SELECT COUNT(*) FROM plugin_installs WHERE plugin_id = $1) WHERE id = $1`, pluginID)
 	return err
 }
