@@ -1,20 +1,7 @@
 import { Outlet, useNavigate, Link, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { LogOut, Github, Puzzle, Bot, LayoutDashboard, User, Shield, Bug } from "lucide-react";
+import { LogOut, Github, Puzzle, Bot, LayoutDashboard, User, Shield, Bug, Store, FolderOpen, ShieldCheck, BarChart3, Users, Settings } from "lucide-react";
 import { api } from "../lib/api";
-
-type NavItem = { path: string; icon: any; label: string; adminOnly?: boolean };
-
-const navItems: NavItem[] = [
-  { path: "/dashboard", icon: Bot, label: "Bot 管理" },
-  { path: "/dashboard/webhook-plugins", icon: Puzzle, label: "Webhook 插件" },
-  { path: "/dashboard/webhook-plugins/debug", icon: Bug, label: "插件调试" },
-];
-
-const bottomItems: NavItem[] = [
-  { path: "/dashboard/settings", icon: User, label: "账号设置" },
-  { path: "/dashboard/admin", icon: Shield, label: "系统管理", adminOnly: true },
-];
 
 export function Layout() {
   const navigate = useNavigate();
@@ -27,6 +14,8 @@ export function Layout() {
 
   if (!user) return null;
 
+  const isAdmin = user.role === "admin" || user.role === "superadmin";
+
   async function handleLogout() {
     await api.logout();
     navigate("/login", { replace: true });
@@ -34,29 +23,35 @@ export function Layout() {
 
   function isActive(path: string) {
     if (path === "/dashboard") return location.pathname === "/dashboard" || location.pathname.startsWith("/dashboard/bot/");
-    if (path === "/dashboard/webhook-plugins") return location.pathname === "/dashboard/webhook-plugins";
-    return location.pathname.startsWith(path);
+    return location.pathname === path;
   }
 
-  function renderNav(items: NavItem[]) {
-    return items.map((item) => {
-      if (item.adminOnly && user.role !== "admin" && user.role !== "superadmin") return null;
-      const active = isActive(item.path);
-      return (
-        <Link key={item.path} to={item.path}
-          className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-            active ? "bg-secondary text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-          }`}>
-          <item.icon className="w-4 h-4" />
-          {item.label}
-        </Link>
-      );
-    });
+  function navLink(path: string, label: string, icon: any, indent = false) {
+    const active = isActive(path);
+    const Icon = icon;
+    return (
+      <Link key={path} to={path}
+        className={`flex items-center gap-2 rounded-lg text-sm transition-colors ${indent ? "pl-9 pr-3 py-1.5" : "px-3 py-2"} ${
+          active ? "bg-secondary text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+        }`}>
+        {!indent && <Icon className="w-4 h-4" />}
+        {label}
+      </Link>
+    );
+  }
+
+  function sectionLabel(label: string, icon: any) {
+    const Icon = icon;
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <Icon className="w-3.5 h-3.5" />
+        {label}
+      </div>
+    );
   }
 
   return (
     <div className="h-screen flex">
-      {/* Sidebar — fixed height, independent scroll */}
       <aside className="w-52 border-r flex flex-col shrink-0 h-screen sticky top-0">
         {/* Logo */}
         <div className="px-4 py-4 border-b shrink-0">
@@ -66,17 +61,27 @@ export function Layout() {
           </Link>
         </div>
 
-        {/* Primary nav */}
+        {/* Nav */}
         <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-          {renderNav(navItems)}
+          {navLink("/dashboard", "Bot 管理", Bot)}
+
+          {sectionLabel("Webhook 插件", Puzzle)}
+          {navLink("/dashboard/webhook-plugins", "市场", Store, true)}
+          {navLink("/dashboard/webhook-plugins/my", "我的插件", FolderOpen, true)}
+          {navLink("/dashboard/webhook-plugins/debug", "调试器", Bug, true)}
+          {isAdmin && navLink("/dashboard/webhook-plugins/review", "审核", ShieldCheck, true)}
         </nav>
 
-        {/* Secondary nav + user */}
+        {/* Bottom nav */}
         <div className="border-t px-2 py-2 space-y-0.5 shrink-0">
-          {renderNav(bottomItems)}
+          {navLink("/dashboard/settings", "账号设置", User)}
+          {isAdmin && sectionLabel("系统管理", Shield)}
+          {isAdmin && navLink("/dashboard/admin", "概览", BarChart3, true)}
+          {isAdmin && navLink("/dashboard/admin/users", "用户管理", Users, true)}
+          {isAdmin && navLink("/dashboard/admin/config", "系统配置", Settings, true)}
         </div>
 
-        {/* User footer */}
+        {/* User */}
         <div className="border-t px-3 py-3 space-y-2 shrink-0">
           <div className="flex items-center gap-2 px-1">
             <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center text-xs font-medium">
@@ -100,7 +105,6 @@ export function Layout() {
         </div>
       </aside>
 
-      {/* Main content — scrolls independently */}
       <main className="flex-1 overflow-auto h-screen">
         <div className="max-w-4xl mx-auto p-6">
           <Outlet />

@@ -21,15 +21,22 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/" element={<HomePage />} />
         <Route path="/webhook-plugins" element={<PluginsPage />} />
         <Route path="/login" element={<LoginPage />} />
-        {/* Dashboard (authenticated, sidebar layout) */}
+        {/* Dashboard */}
         <Route path="/dashboard" element={<Layout />}>
           <Route index element={<BotsPage />} />
           <Route path="bot/:id" element={<BotDetailPage />} />
           <Route path="bot/:id/channel/:cid" element={<ChannelDetailPage />} />
-          <Route path="webhook-plugins" element={<PluginsPage embedded />} />
+          {/* Webhook plugins */}
+          <Route path="webhook-plugins" element={<PluginsPage embedded tab="marketplace" />} />
+          <Route path="webhook-plugins/my" element={<PluginsPage embedded tab="my" />} />
           <Route path="webhook-plugins/debug" element={<PluginDebugPage />} />
+          <Route path="webhook-plugins/review" element={<PluginsPage embedded tab="review" />} />
+          {/* Settings */}
           <Route path="settings" element={<SettingsPage />} />
-          <Route path="admin" element={<AdminPage />} />
+          {/* Admin */}
+          <Route path="admin" element={<AdminPage tab="dashboard" />} />
+          <Route path="admin/users" element={<AdminPage tab="users" />} />
+          <Route path="admin/config" element={<AdminPage tab="config" />} />
         </Route>
       </Routes>
     </BrowserRouter>
