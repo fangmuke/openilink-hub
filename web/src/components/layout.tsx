@@ -4,9 +4,9 @@ import { LogOut, Settings, Github, Puzzle, Bot, LayoutDashboard } from "lucide-r
 import { api } from "../lib/api";
 
 const navItems = [
-  { path: "/", icon: Bot, label: "Bot 管理" },
-  { path: "/webhook-plugins", icon: Puzzle, label: "插件市场" },
-  { path: "/settings", icon: Settings, label: "设置" },
+  { path: "/dashboard", icon: Bot, label: "Bot 管理" },
+  { path: "/dashboard/plugins", icon: Puzzle, label: "插件" },
+  { path: "/dashboard/settings", icon: Settings, label: "设置" },
 ];
 
 export function Layout() {
@@ -22,13 +22,12 @@ export function Layout() {
 
   async function handleLogout() {
     await api.logout();
-    navigate("/login");
+    navigate("/login", { replace: true });
   }
 
   // Determine active nav item (match prefix for sub-pages like /bot/:id)
   function isActive(path: string) {
-    if (path === "/") return location.pathname === "/" || location.pathname.startsWith("/bot/");
-    if (path === "/webhook-plugins") return location.pathname === "/webhook-plugins";
+    if (path === "/dashboard") return location.pathname === "/dashboard" || location.pathname.startsWith("/dashboard/bot/");
     return location.pathname.startsWith(path);
   }
 
@@ -38,7 +37,7 @@ export function Layout() {
       <aside className="w-52 border-r flex flex-col shrink-0">
         {/* Logo */}
         <div className="px-4 py-4 border-b">
-          <Link to="/" className="flex items-center gap-2 hover:opacity-80">
+          <Link to="/dashboard" className="flex items-center gap-2 hover:opacity-80">
             <LayoutDashboard className="w-5 h-5 text-primary" />
             <span className="font-semibold text-sm">OpenILink Hub</span>
           </Link>

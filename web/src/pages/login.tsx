@@ -33,7 +33,7 @@ export function LoginPage() {
       } else {
         await api.login(username, password);
       }
-      navigate("/");
+      navigate("/dashboard");
     } catch (err: any) {
       setError(err.message);
     } finally {

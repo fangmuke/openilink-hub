@@ -26,7 +26,7 @@ export function ChannelDetailPage() {
   async function handleDelete() {
     if (!confirm("删除此渠道？")) return;
     await api.deleteChannel(botId!, channelId!);
-    navigate(`/bot/${botId}`);
+    navigate(`/dashboard/bot/${botId}`);
   }
 
   async function handleToggle() {
@@ -49,7 +49,7 @@ export function ChannelDetailPage() {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3 pb-4 border-b">
-        <Link to={`/bot/${botId}`} className="text-muted-foreground hover:text-foreground">
+        <Link to={`/dashboard/bot/${botId}`} className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div className="flex-1 min-w-0">

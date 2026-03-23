@@ -18,7 +18,7 @@ export function HomePage() {
       <header className="border-b px-6 py-3 flex items-center justify-between">
         <span className="font-semibold text-sm">OpenILink Hub</span>
         <div className="flex items-center gap-2">
-          <Link to="/marketplace">
+          <Link to="/plugins">
             <Button variant="ghost" size="sm" className="text-xs">插件市场</Button>
           </Link>
           <Link to="/login">

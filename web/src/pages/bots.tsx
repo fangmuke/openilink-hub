@@ -135,7 +135,7 @@ function BotCard({ bot, channelCount, onRefresh }: { bot: any; channelCount: num
   return (
     <Card
       className="flex items-center justify-between cursor-pointer hover:border-primary/50 transition-colors"
-      onClick={() => navigate(`/bot/${bot.id}`)}
+      onClick={() => navigate(`/dashboard/bot/${bot.id}`)}
     >
       <div>
         <p className="font-medium text-sm">{bot.name}</p>

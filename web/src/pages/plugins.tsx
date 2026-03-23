@@ -126,7 +126,7 @@ export function PluginsPage({ embedded }: { embedded?: boolean }) {
     <div className="min-h-screen flex flex-col">
       <header className="border-b px-6 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
-          <Link to="/home" className="text-muted-foreground hover:text-foreground"><ArrowLeft className="w-4 h-4" /></Link>
+          <Link to="/" className="text-muted-foreground hover:text-foreground"><ArrowLeft className="w-4 h-4" /></Link>
           <Puzzle className="w-4 h-4 text-primary" />
           <span className="font-semibold text-sm">Webhook 插件市场</span>
         </div>

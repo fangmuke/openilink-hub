@@ -313,7 +313,7 @@ export function BotDetailPage() {
     <div className="flex flex-col h-[calc(100vh-64px)]">
       {/* Header */}
       <div className="flex items-center gap-3 pb-4 border-b shrink-0">
-        <Link to="/" className="text-muted-foreground hover:text-foreground">
+        <Link to="/dashboard" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div className="flex-1 min-w-0">
@@ -324,7 +324,7 @@ export function BotDetailPage() {
           {bot.status === "session_expired" ? "已过期" : bot.status}
         </Badge>
         {bot.status === "session_expired" && (
-          <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => navigate("/")}>
+          <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => navigate("/dashboard")}>
             <QrCode className="w-3.5 h-3.5 mr-1" /> 重新绑定
           </Button>
         )}
@@ -346,7 +346,7 @@ export function BotDetailPage() {
             <p className="text-sm text-muted-foreground">Bot 的微信登录会话已过期，需要重新扫码绑定。重新绑定后，现有通道和配置将自动保留。</p>
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" size="sm" onClick={() => setShowRebind(false)}>稍后</Button>
-              <Button size="sm" onClick={() => navigate("/")}>去重新绑定</Button>
+              <Button size="sm" onClick={() => navigate("/dashboard")}>去重新绑定</Button>
             </div>
           </div>
         </div>
@@ -596,7 +596,7 @@ function ChannelCard({ botId, channel, onRefresh }: { botId: string; channel: an
   return (
     <div
       className="p-3 rounded-lg border bg-card cursor-pointer hover:border-primary/50 transition-colors"
-      onClick={() => nav(`/bot/${botId}/channel/${channel.id}`)}
+      onClick={() => nav(`/dashboard/bot/${botId}/channel/${channel.id}`)}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
