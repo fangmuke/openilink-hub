@@ -106,6 +106,30 @@ export const api = {
     request(`/api/admin/webhook-plugins/${id}/review`, { method: "PUT", body: JSON.stringify({ status, reason: reason || "" }) }),
   deletePlugin: (id: string) => request(`/api/admin/webhook-plugins/${id}`, { method: "DELETE" }),
 
+  // Apps
+  createApp: (data: any) => request<any>("/api/apps", { method: "POST", body: JSON.stringify(data) }),
+  listApps: () => request<any[]>("/api/apps"),
+  getApp: (id: string) => request<any>(`/api/apps/${id}`),
+  updateApp: (id: string, data: any) => request<any>(`/api/apps/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteApp: (id: string) => request(`/api/apps/${id}`, { method: "DELETE" }),
+
+  // App Installations
+  installApp: (appId: string, data: any) => request<any>(`/api/apps/${appId}/install`, { method: "POST", body: JSON.stringify(data) }),
+  listInstallations: (appId: string) => request<any[]>(`/api/apps/${appId}/installations`),
+  getInstallation: (appId: string, iid: string) => request<any>(`/api/apps/${appId}/installations/${iid}`),
+  updateInstallation: (appId: string, iid: string, data: any) =>
+    request<any>(`/api/apps/${appId}/installations/${iid}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteInstallation: (appId: string, iid: string) =>
+    request(`/api/apps/${appId}/installations/${iid}`, { method: "DELETE" }),
+  regenerateToken: (appId: string, iid: string) =>
+    request<any>(`/api/apps/${appId}/installations/${iid}/regenerate-token`, { method: "POST" }),
+  verifyUrl: (appId: string, iid: string) =>
+    request<any>(`/api/apps/${appId}/installations/${iid}/verify-url`, { method: "POST" }),
+  listEventLogs: (appId: string, iid: string, limit = 50) =>
+    request<any[]>(`/api/apps/${appId}/installations/${iid}/event-logs?limit=${limit}`),
+  listApiLogs: (appId: string, iid: string, limit = 50) =>
+    request<any[]>(`/api/apps/${appId}/installations/${iid}/api-logs?limit=${limit}`),
+
   // Webhook logs
   webhookLogs: (botId: string, channelId?: string, limit = 50) =>
     request<any[]>(`/api/bots/${botId}/webhook-logs?limit=${limit}${channelId ? "&channel_id=" + channelId : ""}`),

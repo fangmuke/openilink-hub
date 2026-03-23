@@ -12,6 +12,8 @@ import { PluginsPage } from "./pages/plugins";
 import { ChannelDetailPage } from "./pages/channel-detail";
 import { AdminPage } from "./pages/admin";
 import { PluginDebugPage } from "./pages/plugin-debug";
+import { AppsPage } from "./pages/apps";
+import { AppDetailPage } from "./pages/app-detail";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -31,6 +33,9 @@ createRoot(document.getElementById("root")!).render(
           <Route path="webhook-plugins/my" element={<PluginsPage embedded tab="my" />} />
           <Route path="webhook-plugins/debug" element={<PluginDebugPage />} />
           <Route path="webhook-plugins/review" element={<PluginsPage embedded tab="review" />} />
+          {/* Apps */}
+          <Route path="apps" element={<AppsPage />} />
+          <Route path="apps/:id" element={<AppDetailPage />} />
           {/* Settings */}
           <Route path="settings" element={<SettingsPage />} />
           {/* Admin */}

@@ -1,6 +1,6 @@
 import { Outlet, useNavigate, Link, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { LogOut, Github, Puzzle, Bot, LayoutDashboard, User, Shield, Bug, Store, FolderOpen, ShieldCheck, BarChart3, Users, Settings } from "lucide-react";
+import { LogOut, Github, Puzzle, Bot, LayoutDashboard, User, Shield, Bug, Store, FolderOpen, ShieldCheck, BarChart3, Users, Settings, Blocks } from "lucide-react";
 import { api } from "../lib/api";
 
 export function Layout() {
@@ -23,6 +23,7 @@ export function Layout() {
 
   function isActive(path: string) {
     if (path === "/dashboard") return location.pathname === "/dashboard" || location.pathname.startsWith("/dashboard/bot/");
+    if (path === "/dashboard/apps") return location.pathname.startsWith("/dashboard/apps");
     return location.pathname === path;
   }
 
@@ -64,6 +65,7 @@ export function Layout() {
         {/* Nav */}
         <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
           {navLink("/dashboard", "Bot 管理", Bot)}
+          {navLink("/dashboard/apps", "App 管理", Blocks)}
 
           {sectionLabel("Webhook 插件", Puzzle)}
           {navLink("/dashboard/webhook-plugins", "市场", Store, true)}

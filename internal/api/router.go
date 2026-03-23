@@ -136,6 +136,22 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("PUT /api/admin/users/{id}/password", s.requireAdmin(s.handleResetUserPassword))
 	protected.HandleFunc("DELETE /api/admin/users/{id}", s.requireAdmin(s.handleDeleteUser))
 
+	// --- Apps ---
+	protected.HandleFunc("POST /api/apps", s.handleCreateApp)
+	protected.HandleFunc("GET /api/apps", s.handleListApps)
+	protected.HandleFunc("GET /api/apps/{id}", s.handleGetApp)
+	protected.HandleFunc("PUT /api/apps/{id}", s.handleUpdateApp)
+	protected.HandleFunc("DELETE /api/apps/{id}", s.handleDeleteApp)
+	protected.HandleFunc("POST /api/apps/{id}/install", s.handleInstallApp)
+	protected.HandleFunc("GET /api/apps/{id}/installations", s.handleListInstallations)
+	protected.HandleFunc("GET /api/apps/{id}/installations/{iid}", s.handleGetInstallation)
+	protected.HandleFunc("PUT /api/apps/{id}/installations/{iid}", s.handleUpdateInstallation)
+	protected.HandleFunc("DELETE /api/apps/{id}/installations/{iid}", s.handleDeleteInstallation)
+	protected.HandleFunc("POST /api/apps/{id}/installations/{iid}/regenerate-token", s.handleRegenerateToken)
+	protected.HandleFunc("POST /api/apps/{id}/installations/{iid}/verify-url", s.handleVerifyURL)
+	protected.HandleFunc("GET /api/apps/{id}/installations/{iid}/event-logs", s.handleAppEventLogs)
+	protected.HandleFunc("GET /api/apps/{id}/installations/{iid}/api-logs", s.handleAppAPILogs)
+
 	// --- Webhook plugins (authenticated actions) ---
 	protected.HandleFunc("POST /api/webhook-plugins/submit", s.handleSubmitPlugin)
 	protected.HandleFunc("POST /api/webhook-plugins/{id}/versions/{vid}/cancel", s.handleCancelVersion)
@@ -160,6 +176,14 @@ func (s *Server) Handler() http.Handler {
 	protected.HandleFunc("DELETE /api/admin/config/ai", s.requireAdmin(s.handleDeleteAIConfig))
 
 	mux.Handle("/api/", auth.Middleware(s.DB)(protected))
+
+	// --- Bot API (app_token auth) ---
+	botAPI := http.NewServeMux()
+	botAPI.HandleFunc("POST /bot/v1/messages/send", s.handleBotAPISend)
+	botAPI.HandleFunc("GET /bot/v1/contacts", s.handleBotAPIContacts)
+	botAPI.HandleFunc("GET /bot/v1/bot", s.handleBotAPIBotInfo)
+	botAPI.HandleFunc("/bot/", s.handleBotAPINotFound)
+	mux.Handle("/bot/", s.appTokenAuth(botAPI))
 
 	// Serve embedded frontend (production) or skip (dev mode uses vite)
 	if handler := web.Handler(); handler != nil {

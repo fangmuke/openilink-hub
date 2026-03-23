@@ -11,6 +11,7 @@ import (
 	"time"
 	"sync"
 
+	appdelivery "github.com/openilink/openilink-hub/internal/app"
 	"github.com/openilink/openilink-hub/internal/database"
 	"github.com/openilink/openilink-hub/internal/provider"
 	"github.com/openilink/openilink-hub/internal/relay"
@@ -44,6 +45,7 @@ type Manager struct {
 	store     *storage.Storage    // optional, for media files
 	baseURL   string              // Hub origin for proxy URLs
 	dlSem     chan struct{}        // semaphore for concurrent media downloads
+	appDisp   *appdelivery.Dispatcher // app event delivery
 }
 
 func NewManager(db *database.DB, hub *relay.Hub, sinks []sink.Sink, store *storage.Storage, baseURL string) *Manager {
@@ -55,6 +57,7 @@ func NewManager(db *database.DB, hub *relay.Hub, sinks []sink.Sink, store *stora
 		store:     store,
 		baseURL:   baseURL,
 		dlSem:     make(chan struct{}, maxConcurrentDownloads),
+		appDisp:   appdelivery.NewDispatcher(db),
 	}
 }
 
@@ -297,6 +300,9 @@ func (m *Manager) onInbound(inst *Instance, msg provider.InboundMessage) {
 
 	// Phase 3: Deliver to sinks
 	m.deliverToChannels(inst, msg, parsed, matched, msgID)
+
+	// Phase 4: Deliver to Apps
+	go m.deliverToApps(inst, msg, parsed)
 }
 
 // parsedMessage holds extracted info from an inbound message.
