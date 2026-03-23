@@ -1,6 +1,6 @@
 # --- Build frontend ---
 FROM node:22-alpine AS frontend
-RUN npm install -g pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app/web
 COPY web/package.json web/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
