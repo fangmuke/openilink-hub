@@ -1,0 +1,15 @@
+#!/bin/sh
+# Pre-commit hook: run TypeScript type check on web before committing
+
+WEB_DIR="$(git rev-parse --show-toplevel)/web"
+
+# Only run if web files are staged
+if git diff --cached --name-only | grep -q "^web/"; then
+  echo "🔍 Running TypeScript type check..."
+  cd "$WEB_DIR" && pnpm type-check
+  if [ $? -ne 0 ]; then
+    echo "❌ TypeScript type check failed. Fix errors before committing."
+    exit 1
+  fi
+  echo "✅ Type check passed."
+fi
