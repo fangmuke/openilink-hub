@@ -66,7 +66,9 @@ const loginCopy = {
   registerFailed: "注册失败",
 } as const;
 
-function localizeAuthError(message: string): string {
+function localizeAuthError(rawMessage: unknown): string {
+  const original = typeof rawMessage === "string" ? rawMessage.trim() : "";
+  const key = original.toLowerCase();
   const translations: Record<string, string> = {
     cancelled: loginCopy.cancelled,
     "username and password required": loginCopy.usernameAndPasswordRequired,
@@ -83,11 +85,14 @@ function localizeAuthError(message: string): string {
     "register failed": loginCopy.registerFailed,
   };
 
-  if (message.startsWith("registration failed:")) {
-    return `${loginCopy.registrationFailed}：${message.slice("registration failed:".length).trim()}`;
+  if (!key) return loginCopy.loginFailed;
+
+  if (key.startsWith("registration failed:")) {
+    const reason = original.slice("registration failed:".length).trim();
+    return reason ? `${loginCopy.registrationFailed}：${localizeAuthError(reason)}` : loginCopy.registrationFailed;
   }
 
-  return translations[message] || message;
+  return translations[key] || original;
 }
 
 function base64urlToBuffer(b64: string): ArrayBuffer {
@@ -145,7 +150,7 @@ export function LoginPage() {
 
       navigate("/dashboard");
     } catch (err: any) {
-      setError(localizeAuthError(err.message));
+      setError(localizeAuthError(err?.message ?? err));
     }
 
     setLoading(false);
@@ -208,7 +213,7 @@ export function LoginPage() {
       navigate("/dashboard");
     } catch (err: any) {
       if (err.name !== "NotAllowedError") {
-        setError(localizeAuthError(err.message || copy.passkeyLoginFailed));
+        setError(localizeAuthError(err?.message ?? err ?? copy.passkeyLoginFailed));
       }
     }
 
@@ -285,7 +290,7 @@ export function LoginPage() {
       navigate("/dashboard");
     } catch (err: any) {
       if (err.name !== "NotAllowedError") {
-        setError(localizeAuthError(err.message || copy.passkeyRegisterFailed));
+        setError(localizeAuthError(err?.message ?? err ?? copy.passkeyRegisterFailed));
       }
     }
 
