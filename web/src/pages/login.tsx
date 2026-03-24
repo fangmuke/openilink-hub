@@ -21,6 +21,75 @@ const providerLabels: Record<string, string> = {
   linuxdo: "LinuxDo",
 };
 
+const loginCopy = {
+  brand: "OpeniLink Hub",
+  welcome: "欢迎回来",
+  createAccount: "创建你的账号",
+  loginIntro: "登录后即可管理 Bot、渠道和 Webhook 插件。",
+  registerIntro: "注册后就可以开始配置微信 Bot 和消息路由。",
+  loginTitle: "登录你的账号",
+  registerTitle: "创建新账号",
+  continueWithAccount: "或继续使用账号",
+  username: "用户名",
+  usernamePlaceholder: "请输入用户名",
+  password: "密码",
+  passwordHint: "至少 8 位",
+  loginPasswordPlaceholder: "请输入密码",
+  registerPasswordPlaceholder: "设置登录密码",
+  passkeyLoginSeparator: "或使用 Passkey",
+  passkeyRegisterSeparator: "或直接创建 Passkey",
+  passkeyLogin: "使用 Passkey 登录",
+  passkeyRegister: "使用 Passkey 注册（无需密码）",
+  passkeyRegisterHint: "Passkey 注册会使用上方填写的用户名创建账号。",
+  login: "登录",
+  register: "注册",
+  noAccount: "没有账号？",
+  hasAccount: "已有账号？",
+  supportText: "支持密码、Passkey 和 OAuth 登录方式。",
+  oauthLogin: (provider: string) => `使用 ${provider} 登录`,
+  enterUsernameFirst: "请先输入用户名",
+  passkeyLoginFailed: "Passkey 登录失败",
+  passkeyRegisterFailed: "Passkey 注册失败",
+  cancelled: "已取消",
+  usernameAndPasswordRequired: "请输入用户名和密码",
+  usernameLength: "用户名长度需为 2 到 32 个字符",
+  passwordTooShort: "密码至少需要 8 位",
+  usernameTaken: "用户名已被占用",
+  invalidCredentials: "用户名或密码错误",
+  accountDisabled: "账号已被禁用",
+  invalidRequest: "请求无效",
+  usernameRequired: "请输入用户名",
+  userNotFound: "用户不存在",
+  noRegistrationSession: "注册会话不存在",
+  registrationFailed: "注册失败",
+  loginFailed: "登录失败",
+  registerFailed: "注册失败",
+} as const;
+
+function localizeAuthError(message: string): string {
+  const translations: Record<string, string> = {
+    cancelled: loginCopy.cancelled,
+    "username and password required": loginCopy.usernameAndPasswordRequired,
+    "username must be 2-32 characters": loginCopy.usernameLength,
+    "password must be at least 8 characters": loginCopy.passwordTooShort,
+    "username already taken": loginCopy.usernameTaken,
+    "invalid credentials": loginCopy.invalidCredentials,
+    "account disabled": loginCopy.accountDisabled,
+    "invalid request": loginCopy.invalidRequest,
+    "username required": loginCopy.usernameRequired,
+    "user not found": loginCopy.userNotFound,
+    "no registration session": loginCopy.noRegistrationSession,
+    "login failed": loginCopy.loginFailed,
+    "register failed": loginCopy.registerFailed,
+  };
+
+  if (message.startsWith("registration failed:")) {
+    return `${loginCopy.registrationFailed}：${message.slice("registration failed:".length).trim()}`;
+  }
+
+  return translations[message] || message;
+}
+
 function base64urlToBuffer(b64: string): ArrayBuffer {
   const base64 = b64.replace(/-/g, "+").replace(/_/g, "/");
   const pad = base64.length % 4 === 0 ? "" : "=".repeat(4 - (base64.length % 4));
@@ -47,6 +116,7 @@ function bufferToBase64url(buf: ArrayBuffer): string {
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const copy = loginCopy;
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -75,7 +145,7 @@ export function LoginPage() {
 
       navigate("/dashboard");
     } catch (err: any) {
-      setError(err.message);
+      setError(localizeAuthError(err.message));
     }
 
     setLoading(false);
@@ -138,7 +208,7 @@ export function LoginPage() {
       navigate("/dashboard");
     } catch (err: any) {
       if (err.name !== "NotAllowedError") {
-        setError(err.message || "Passkey 登录失败");
+        setError(localizeAuthError(err.message || copy.passkeyLoginFailed));
       }
     }
 
@@ -147,7 +217,7 @@ export function LoginPage() {
 
   async function handlePasskeyRegister() {
     if (!username.trim()) {
-      setError("请先输入用户名");
+      setError(copy.enterUsernameFirst);
       return;
     }
 
@@ -215,7 +285,7 @@ export function LoginPage() {
       navigate("/dashboard");
     } catch (err: any) {
       if (err.name !== "NotAllowedError") {
-        setError(err.message || "Passkey 注册失败");
+        setError(localizeAuthError(err.message || copy.passkeyRegisterFailed));
       }
     }
 
@@ -242,24 +312,22 @@ export function LoginPage() {
         <div className="flex flex-col gap-10">
           <div className="space-y-4 text-center">
             <p className="text-sm font-medium tracking-[0.18em] text-muted-foreground uppercase">
-              OpeniLink Hub
+              {copy.brand}
             </p>
             <div className="space-y-3">
               <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-                {mode === "login" ? "欢迎回来" : "创建你的账号"}
+                {mode === "login" ? copy.welcome : copy.createAccount}
               </h1>
               <p className="text-base leading-7 text-muted-foreground">
-                {mode === "login"
-                  ? "登录后即可管理 Bot、渠道和 Webhook 插件。"
-                  : "注册后就可以开始配置微信 Bot 和消息路由。"}
+                {mode === "login" ? copy.loginIntro : copy.registerIntro}
               </p>
             </div>
           </div>
 
           <Card className="rounded-[1.75rem] border-white/8 bg-card/82 backdrop-blur-sm">
             <CardHeader className="px-6 pt-8 pb-4 text-center sm:px-8">
-              <CardTitle className="text-2xl">OpeniLink Hub</CardTitle>
-              <CardDescription>{mode === "login" ? "登录你的账号" : "创建新账号"}</CardDescription>
+              <CardTitle className="text-2xl">{copy.brand}</CardTitle>
+              <CardDescription>{mode === "login" ? copy.loginTitle : copy.registerTitle}</CardDescription>
             </CardHeader>
             <CardContent className="px-6 pb-8 sm:px-8">
               <form onSubmit={handleSubmit}>
@@ -276,21 +344,21 @@ export function LoginPage() {
                             onClick={() => handleOAuth(provider)}
                             disabled={loading}
                           >
-                            使用 {providerLabels[provider] || provider} 登录
+                            {copy.oauthLogin(providerLabels[provider] || provider)}
                           </Button>
                         ))}
                       </Field>
                       <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
-                        或继续使用账号
+                        {copy.continueWithAccount}
                       </FieldSeparator>
                     </>
                   )}
 
                   <Field>
-                    <FieldLabel htmlFor="username">用户名</FieldLabel>
+                    <FieldLabel htmlFor="username">{copy.username}</FieldLabel>
                     <Input
                       id="username"
-                      placeholder="请输入用户名"
+                      placeholder={copy.usernamePlaceholder}
                       className="h-10 text-base"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
@@ -302,15 +370,17 @@ export function LoginPage() {
 
                   <Field>
                     <div className="flex items-center">
-                      <FieldLabel htmlFor="password">密码</FieldLabel>
+                      <FieldLabel htmlFor="password">{copy.password}</FieldLabel>
                       {mode === "register" && (
-                        <span className="ml-auto text-sm text-muted-foreground">至少 8 位</span>
+                        <span className="ml-auto text-sm text-muted-foreground">{copy.passwordHint}</span>
                       )}
                     </div>
                     <Input
                       id="password"
                       type="password"
-                      placeholder={mode === "login" ? "请输入密码" : "设置登录密码"}
+                      placeholder={
+                        mode === "login" ? copy.loginPasswordPlaceholder : copy.registerPasswordPlaceholder
+                      }
                       className="h-10 text-base"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -324,7 +394,7 @@ export function LoginPage() {
                   {supportsPasskey && (
                     <>
                       <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
-                        {mode === "login" ? "或使用 Passkey" : "或直接创建 Passkey"}
+                        {mode === "login" ? copy.passkeyLoginSeparator : copy.passkeyRegisterSeparator}
                       </FieldSeparator>
                       <Field>
                         <Button
@@ -335,11 +405,11 @@ export function LoginPage() {
                           disabled={loading || (mode === "register" && !username.trim())}
                         >
                           <KeyRound className="mr-2 h-4 w-4" />
-                          {mode === "login" ? "使用 Passkey 登录" : "使用 Passkey 注册（无需密码）"}
+                          {mode === "login" ? copy.passkeyLogin : copy.passkeyRegister}
                         </Button>
                         {mode === "register" && (
                           <FieldDescription className="text-center">
-                            Passkey 注册会使用上方填写的用户名创建账号。
+                            {copy.passkeyRegisterHint}
                           </FieldDescription>
                         )}
                       </Field>
@@ -348,16 +418,16 @@ export function LoginPage() {
 
                   <Field>
                     <Button type="submit" className="w-full" disabled={loading}>
-                      {loading ? "..." : mode === "login" ? "登录" : "注册"}
+                      {loading ? "..." : mode === "login" ? copy.login : copy.register}
                     </Button>
                     <FieldDescription className="text-center">
-                      {mode === "login" ? "没有账号？" : "已有账号？"}{" "}
+                      {mode === "login" ? copy.noAccount : copy.hasAccount}{" "}
                       <button
                         type="button"
                         className="font-medium text-foreground underline underline-offset-4"
                         onClick={toggleMode}
                       >
-                        {mode === "login" ? "注册" : "登录"}
+                        {mode === "login" ? copy.register : copy.login}
                       </button>
                     </FieldDescription>
                   </Field>
@@ -367,7 +437,7 @@ export function LoginPage() {
           </Card>
 
           <FieldDescription className="px-6 pt-1 text-center text-sm leading-6">
-            支持密码、Passkey 和 OAuth 登录方式。
+            {copy.supportText}
           </FieldDescription>
         </div>
       </div>
