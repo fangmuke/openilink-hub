@@ -1,17 +1,25 @@
-function parseResponseError(raw: string, status: number): string {
+function isJsonContentType(contentType: string | null): boolean {
+  if (!contentType) return false;
+  const normalized = contentType.toLowerCase();
+  return normalized.includes("application/json") || normalized.includes("+json");
+}
+
+function parseResponseError(raw: string, status: number, contentType: string | null): string {
   const text = raw.trim();
   if (!text) return `HTTP ${status}`;
 
-  try {
-    const data = JSON.parse(text);
-    if (typeof data === "object" && data !== null && "error" in data && typeof data.error === "string") {
-      return data.error;
+  if (isJsonContentType(contentType)) {
+    try {
+      const data = JSON.parse(text);
+      if (typeof data === "object" && data !== null && "error" in data && typeof data.error === "string") {
+        return data.error;
+      }
+      if (typeof data === "string" && data.trim()) {
+        return data;
+      }
+    } catch {
+      return text;
     }
-    if (typeof data === "string" && data.trim()) {
-      return data;
-    }
-  } catch {
-    return text;
   }
 
   return text;
@@ -34,12 +42,21 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     }
   }
 
+  const contentType = res.headers.get("content-type");
   const raw = await res.text();
-  if (!res.ok) throw new Error(parseResponseError(raw, res.status));
-  if (!raw.trim()) return null as T;
+  if (!res.ok) throw new Error(parseResponseError(raw, res.status, contentType));
+
+  const text = raw.trim();
+  if (!text) {
+    throw new Error(`Empty response body: HTTP ${res.status}`);
+  }
+
+  if (!isJsonContentType(contentType)) {
+    throw new Error(`Unexpected response content type: ${contentType || "unknown"}`);
+  }
 
   try {
-    return JSON.parse(raw) as T;
+    return JSON.parse(text) as T;
   } catch {
     throw new Error(`Invalid JSON response: HTTP ${res.status}`);
   }
@@ -70,7 +87,7 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body,
     }).then(async (r) => {
-      if (!r.ok) throw new Error(parseResponseError(await r.text(), r.status));
+      if (!r.ok) throw new Error(parseResponseError(await r.text(), r.status, r.headers.get("content-type")));
     }),
   deletePasskey: (id: string) => request(`/api/me/passkeys/${id}`, { method: "DELETE" }),
 
