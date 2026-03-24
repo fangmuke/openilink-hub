@@ -1,2 +1,2 @@
 #!/bin/sh
-vp staged --cwd web
+cd web && pnpm exec vp staged

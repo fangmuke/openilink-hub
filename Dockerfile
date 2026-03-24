@@ -1,5 +1,5 @@
 # --- Build frontend ---
-FROM node:22-alpine AS frontend
+FROM node:22-bookworm-slim AS frontend
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app/web
 COPY web/package.json web/pnpm-lock.yaml ./
