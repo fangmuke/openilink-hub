@@ -1,3 +1,22 @@
+function parseResponseError(raw: string, status: number): string {
+  const text = raw.trim();
+  if (!text) return `HTTP ${status}`;
+
+  try {
+    const data = JSON.parse(text);
+    if (typeof data === "object" && data !== null && "error" in data && typeof data.error === "string") {
+      return data.error;
+    }
+    if (typeof data === "string" && data.trim()) {
+      return data;
+    }
+  } catch {
+    return text;
+  }
+
+  return text;
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     credentials: "same-origin",
@@ -15,9 +34,15 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     }
   }
 
-  const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-  return data as T;
+  const raw = await res.text();
+  if (!res.ok) throw new Error(parseResponseError(raw, res.status));
+  if (!raw.trim()) return null as T;
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    throw new Error(`Invalid JSON response: HTTP ${res.status}`);
+  }
 }
 
 export const api = {
@@ -45,7 +70,7 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body,
     }).then(async (r) => {
-      if (!r.ok) throw new Error((await r.json()).error);
+      if (!r.ok) throw new Error(parseResponseError(await r.text(), r.status));
     }),
   deletePasskey: (id: string) => request(`/api/me/passkeys/${id}`, { method: "DELETE" }),
 
