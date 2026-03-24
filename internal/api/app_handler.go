@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	_ "embed"
 	"encoding/json"
 	"net/http"
 	"regexp"
@@ -10,6 +11,14 @@ import (
 	"github.com/openilink/openilink-hub/internal/auth"
 	"github.com/openilink/openilink-hub/internal/database"
 )
+
+//go:embed app_skill.md
+var appSkillMD string
+
+func handleAppSkill(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+	w.Write([]byte(appSkillMD))
+}
 
 var slugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$`)
 
